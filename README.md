@@ -24,9 +24,8 @@ The workflow is automated using ZSH aliases and Python scripts:
 As shown in the output below, the system successfully identifies remote models, such as `meta-llama-3.1-8b-instruct`, and allows for direct terminal-based interaction via `lms chat`.
 
 > **Terminal Output:**
-> `Checking connection to LM Studio on Windows PC...`
-> `✅ Connection successful!`
-> `Available models: meta-llama-3.1-8b-instruct, google/gemma-4-e4b...`
+<img width="370" height="88" alt="image" src="https://github.com/user-attachments/assets/52759264-0597-4568-8c76-18171777f70b" />
+
 
 ---
 *Developed for educational purposes, focusing on system engineering, automation, and local AI integration.*
