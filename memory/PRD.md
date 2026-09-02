@@ -1,0 +1,44 @@
+# CleanEdit — PRD
+
+## Problem statement
+A clean, simple, modern (VSCode-like but minimal) text editor written in C++ for macOS.
+Required areas: Explorer (folder tree), main text editor, console, custom scripting, settings.
+
+## User choices (2026-06)
+- GUI: Native Cocoa / Objective-C++ (AppKit)
+- Scripting languages: Python + JavaScript
+- Syntax highlighting: common langs (C++, Python, JS, JSON, Markdown) + custom `.npa` and `.tpa`
+- Theme: Dark only
+- Delivery: full source + build instructions (built on user's Mac; cannot run in cloud env)
+- Extra: one-click open from folder tree; scripting is the priority feature
+
+## Architecture
+- Native macOS app, Objective-C++ (`.mm`), AppKit + JavaScriptCore.
+- Build via `build.sh` (clang++) or CMake -> `CleanEdit.app` bundle.
+- Frameworks: Cocoa, JavaScriptCore.
+- JSON-driven syntax highlighter (`Resources/languages/*.json`) — user-editable grammars.
+- Scripting: JavaScript via embedded JavaScriptCore (`editor` global); Python via `python3`
+  subprocess with a `cleanedit` helper module + `##CE##` JSON stdout protocol.
+- Scripts stored in `~/Library/Application Support/CleanEdit/scripts/` (examples auto-installed).
+
+## Implemented (2026-06)
+- Activity bar (Explorer / Scripts / Settings) with panel switching.
+- Explorer folder tree (NSOutlineView), single-click opens files.
+- Editor: NSTextView, line-number gutter, syntax highlighting, tabs, multi-document,
+  undo/redo, non-wrapping by default.
+- Console output panel (toggle ⌘J), colored by message type; script stdout/stderr routed here.
+- Scripts panel: list/run (double-click)/edit (single-click)/new/refresh/reveal-folder.
+- Settings: font size, tab width, line numbers, word wrap, console visibility (NSUserDefaults).
+- Dark VSCode-inspired theme; menu bar with standard + custom shortcuts.
+- Languages bundled: C++, Python, JavaScript, JSON, Markdown, NPA, TPA.
+
+## Verification status
+- JSON grammars validated; Python scripts compile; string-highlight regex smoke-tested.
+- NOT compiled/run here (Linux cloud lacks macOS frameworks). Needs Xcode CLT on macOS.
+
+## Backlog / Next
+- Find & replace (⌘F), Go to line.
+- Auto-indent / bracket matching.
+- Refine `.npa` / `.tpa` grammars to the real language spec (placeholders for now).
+- Split editor / side-by-side, session restore (reopen last folder & tabs).
+- App icon, code signing/notarization instructions.

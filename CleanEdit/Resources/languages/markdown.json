@@ -1,0 +1,14 @@
+{
+  "name": "Markdown",
+  "extensions": ["md", "markdown"],
+  "rules": [
+    { "pattern": "^#{1,6} .*$", "type": "heading", "multiline": true },
+    { "pattern": "\\*\\*[^*]+\\*\\*", "type": "keyword" },
+    { "pattern": "\\*[^*]+\\*", "type": "type" },
+    { "pattern": "`[^`]+`", "type": "string" },
+    { "pattern": "```[\\s\\S]*?```", "type": "string" },
+    { "pattern": "\\[[^\\]]+\\]\\([^)]+\\)", "type": "function" },
+    { "pattern": "^\\s*[-*+] ", "type": "keyword", "multiline": true },
+    { "pattern": "^> .*$", "type": "comment", "multiline": true }
+  ]
+}

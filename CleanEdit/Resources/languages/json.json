@@ -1,0 +1,9 @@
+{
+  "name": "JSON",
+  "extensions": ["json"],
+  "stringDelimiters": ["\""],
+  "keywords": ["true", "false", "null"],
+  "rules": [
+    { "pattern": "\"[^\"]*\"(?=\\s*:)", "type": "attribute" }
+  ]
+}

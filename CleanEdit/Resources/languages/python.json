@@ -1,0 +1,27 @@
+{
+  "name": "Python",
+  "extensions": ["py", "pyw"],
+  "lineComment": "#",
+  "stringDelimiters": ["\"", "'"],
+  "functionCalls": true,
+  "keywords": [
+    "def", "class", "return", "if", "elif", "else", "for", "while", "break",
+    "continue", "pass", "import", "from", "as", "with", "try", "except",
+    "finally", "raise", "lambda", "yield", "global", "nonlocal", "assert",
+    "del", "in", "is", "not", "and", "or", "async", "await", "match", "case"
+  ],
+  "types": [
+    "None", "True", "False", "int", "str", "float", "list", "dict", "set",
+    "tuple", "bool", "bytes", "complex", "object", "type"
+  ],
+  "builtins": [
+    "print", "len", "range", "open", "self", "cls", "super", "enumerate",
+    "zip", "map", "filter", "sorted", "sum", "min", "max", "abs", "input",
+    "isinstance", "hasattr", "getattr", "setattr", "format"
+  ],
+  "rules": [
+    { "pattern": "\"\"\"[\\s\\S]*?\"\"\"", "type": "string" },
+    { "pattern": "'''[\\s\\S]*?'''", "type": "string" },
+    { "pattern": "@[A-Za-z_][A-Za-z0-9_.]*", "type": "type", "multiline": true }
+  ]
+}

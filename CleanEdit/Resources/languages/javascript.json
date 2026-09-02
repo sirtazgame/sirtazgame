@@ -1,0 +1,24 @@
+{
+  "name": "JavaScript",
+  "extensions": ["js", "mjs", "jsx", "ts", "tsx"],
+  "lineComment": "//",
+  "blockCommentStart": "/*",
+  "blockCommentEnd": "*/",
+  "stringDelimiters": ["\"", "'", "`"],
+  "functionCalls": true,
+  "keywords": [
+    "var", "let", "const", "function", "return", "if", "else", "for", "while",
+    "do", "break", "continue", "switch", "case", "default", "new", "delete",
+    "typeof", "instanceof", "in", "of", "this", "class", "extends", "super",
+    "import", "export", "from", "as", "async", "await", "yield", "try",
+    "catch", "finally", "throw", "void", "null", "undefined", "true", "false"
+  ],
+  "types": [
+    "String", "Number", "Boolean", "Object", "Array", "Promise", "Symbol",
+    "Map", "Set", "Date", "RegExp", "Error"
+  ],
+  "builtins": [
+    "console", "document", "window", "Math", "JSON", "editor", "require",
+    "module", "process", "setTimeout", "setInterval", "parseInt", "parseFloat"
+  ]
+}
