@@ -23,6 +23,12 @@ scripting system, and settings.
 Bundled languages: **C++, Python, JavaScript, JSON, Markdown**, plus your own
 **`.npa`** and **`.tpa`** formats.
 
+The `.npa` grammar highlights `##` comment rows, `[TAG]` section markers (named tags in one
+color, numeric IDs in another), `>`/`<` legend rows, and binary/number data. The `.tpa`
+grammar highlights `> name.mpa` segment names, `^ ` comments, `##====##` borders, and `>>`
+segment starters. Tweak any of these by editing `Resources/languages/npa.json` /
+`tpa.json` (see the flexible format below) and rebuilding.
+
 Highlighting is defined by simple JSON files in `Resources/languages/`. To tweak the
 `.npa` / `.tpa` grammars (keywords, comments, section headers, etc.) just edit
 `Resources/languages/npa.json` and `tpa.json` — no recompilation of grammars needed;

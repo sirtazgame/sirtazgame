@@ -1129,6 +1129,18 @@ static void pinFill(NSView *v, NSView *container) {
         dispatch_async(dispatch_get_main_queue(), ^{ [self appendConsole:text type:type]; });
         return;
     }
+    if ([type isEqualToString:@"section"]) {
+        NSString *dashes = [@"" stringByPaddingToLength:22 withString:@"\u2500" startingAtIndex:0];
+        NSString *header = [NSString stringWithFormat:@"\n\u2500\u2500\u2500 %@ %@\n", text ?: @"", dashes];
+        NSDictionary *hattrs = @{
+            NSForegroundColorAttributeName: [Theme accentColor],
+            NSFontAttributeName: [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightBold]
+        };
+        [_consoleView.textStorage appendAttributedString:[[NSAttributedString alloc] initWithString:header attributes:hattrs]];
+        [_consoleView scrollRangeToVisible:NSMakeRange(_consoleView.string.length, 0)];
+        if (!_consoleVisible) [self setConsoleVisible:YES];
+        return;
+    }
     NSDictionary *attrs = @{
         NSForegroundColorAttributeName: [Theme consoleColorForType:type],
         NSFontAttributeName: [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular]

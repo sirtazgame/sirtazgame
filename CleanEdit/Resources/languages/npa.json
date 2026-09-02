@@ -1,13 +1,11 @@
 {
   "name": "NPA",
   "extensions": ["npa"],
-  "lineComment": "#",
-  "stringDelimiters": ["\"", "'"],
-  "keywords": ["true", "false", "null", "on", "off", "yes", "no", "define", "end"],
-  "types": ["node", "point", "path", "vector", "group"],
+  "lineComment": "##",
   "rules": [
-    { "pattern": "^\\s*\\[[^\\]]+\\]", "type": "heading", "multiline": true },
-    { "pattern": "^\\s*[A-Za-z_][\\w.-]*(?=\\s*[:=])", "type": "attribute", "multiline": true },
-    { "pattern": "@[A-Za-z_][\\w]*", "type": "function", "multiline": true }
+    { "pattern": "^[ \\t]*[><].*$", "type": "function", "multiline": true },
+    { "pattern": "\\[[A-Za-z_][A-Za-z0-9_]*\\]", "type": "keyword" },
+    { "pattern": "\\[[0-9]+\\]", "type": "attribute" },
+    { "pattern": "\\.\\.\\.", "type": "border" }
   ]
 }

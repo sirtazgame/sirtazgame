@@ -34,6 +34,7 @@ static NSColor *hex(int r, int g, int b) {
             @"heading":   hex(0x56, 0x9c, 0xd6),
             @"attribute": hex(0x9c, 0xdc, 0xfe),
             @"operator":  hex(0xd4, 0xd4, 0xd4),
+            @"border":    hex(0x80, 0x80, 0x80),
             @"constant":  hex(0x56, 0x9c, 0xd6),
         };
     });

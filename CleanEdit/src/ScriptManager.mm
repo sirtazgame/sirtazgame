@@ -95,6 +95,11 @@
         arg = value;
     }
 
+    NSDateFormatter *df = [[NSDateFormatter alloc] init];
+    df.dateFormat = @"HH:mm:ss";
+    [host appendConsole:[NSString stringWithFormat:@"%@  %@", url.lastPathComponent, [df stringFromDate:[NSDate date]]]
+                   type:@"section"];
+
     if ([ext isEqualToString:@"js"]) {
         [JSScriptRunner runScriptAtPath:url.path argument:arg host:host];
     } else if ([ext isEqualToString:@"py"]) {

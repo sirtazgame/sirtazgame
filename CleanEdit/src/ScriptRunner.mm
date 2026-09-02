@@ -32,7 +32,6 @@
         [host appendConsole:[NSString stringWithFormat:@"JS Error: %@", e] type:@"error"];
     };
 
-    [host appendConsole:[NSString stringWithFormat:@"\u25B6 Running %@", path.lastPathComponent] type:@"info"];
     [ctx evaluateScript:src];
     [host appendConsole:@"\u2713 Finished" type:@"success"];
 }
@@ -86,8 +85,6 @@ static NSMutableArray *gRunningTasks;  // keep NSTask instances alive
     NSMutableString *outBuffer = [NSMutableString string];
     NSMutableString *errBuffer = [NSMutableString string];
     NSString *marker = @"##CE##";
-
-    [host appendConsole:[NSString stringWithFormat:@"\u25B6 Running %@", path.lastPathComponent] type:@"info"];
 
     outPipe.fileHandleForReading.readabilityHandler = ^(NSFileHandle *fh) {
         NSData *data = fh.availableData;

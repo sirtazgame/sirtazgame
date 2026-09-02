@@ -1,13 +1,10 @@
 {
   "name": "TPA",
   "extensions": ["tpa"],
-  "lineComment": "#",
-  "stringDelimiters": ["\"", "'"],
-  "keywords": ["true", "false", "null", "on", "off", "yes", "no", "template", "end"],
-  "types": ["text", "block", "token", "region", "style"],
+  "lineComment": "^ ",
   "rules": [
-    { "pattern": "^\\s*\\[[^\\]]+\\]", "type": "heading", "multiline": true },
-    { "pattern": "^\\s*[A-Za-z_][\\w.-]*(?=\\s*[:=])", "type": "attribute", "multiline": true },
-    { "pattern": "\\{\\{[^}]+\\}\\}", "type": "function" }
+    { "pattern": "^[ \\t]*##=+##[ \\t]*$", "type": "border", "multiline": true },
+    { "pattern": "^[ \\t]*>>", "type": "keyword", "multiline": true },
+    { "pattern": "^[ \\t]*>[ \\t].*$", "type": "heading", "multiline": true }
   ]
 }

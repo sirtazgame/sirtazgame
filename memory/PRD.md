@@ -30,6 +30,12 @@ Required areas: Explorer (folder tree), main text editor, console, custom script
 - Settings: font size, tab width, line numbers, word wrap, console visibility (NSUserDefaults).
 - Dark VSCode-inspired theme; menu bar with standard + custom shortcuts.
 - Languages bundled: C++, Python, JavaScript, JSON, Markdown, NPA, TPA.
+- NPA/TPA grammars matched to the user's real spec (2026-06): NPA `##` comments, `[TAG]`
+  named + `[0-9]` numeric-id markers, `>`/`<` legend rows, binary/number data; TPA
+  `> name.mpa` segment names, `^ ` comments, `##====##` borders, `>>` segment starters.
+  Added a "border" (grey) theme token.
+- Console: each script run emits a labelled section header (name + timestamp) so runs are
+  easy to tell apart.
 - Script shortcuts: bind custom key combos to scripts (right-click → Assign Shortcut); shown
   in the script list, registered as Scripts-menu items, persisted in NSUserDefaults.
 - Session restore: last folder + open tabs + active tab reopened on launch.
