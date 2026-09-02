@@ -28,6 +28,28 @@
     [self.outlineView reloadData];
 }
 
+- (void)refresh {
+    if (_rootURL) [self setRootURL:_rootURL];
+}
+
+- (FileNode *)nodeForActiveRow {
+    NSInteger row = self.outlineView.clickedRow;
+    if (row < 0) row = self.outlineView.selectedRow;
+    if (row < 0) return nil;
+    id item = [self.outlineView itemAtRow:row];
+    return [item isKindOfClass:[FileNode class]] ? item : nil;
+}
+
+- (NSURL *)clickedOrSelectedURL {
+    return [self nodeForActiveRow].url;
+}
+
+- (NSURL *)selectedDirectoryURL {
+    FileNode *n = [self nodeForActiveRow];
+    if (!n) return _rootURL;
+    return n.isDirectory ? n.url : n.url.URLByDeletingLastPathComponent;
+}
+
 - (FileNode *)nodeForURL:(NSURL *)url {
     FileNode *n = [FileNode new];
     n.url = url;

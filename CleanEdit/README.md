@@ -8,10 +8,14 @@ scripting system, and settings.
 
 ## Features
 
-- **Explorer** — open a folder and browse it as a tree. **One click opens a file.**
-- **Editor** — clean monospaced editor with line numbers, syntax highlighting, tabs,
-  undo/redo, and multiple open documents.
-- **Console** — output panel for script results and errors (toggle with `⌘J`).
+- **Explorer** — open a folder and browse it as a tree. **One click opens a file.** New
+  file / new folder buttons in the header, plus a right-click menu (New File, New Folder,
+  Rename, Move to Trash, Reveal in Finder, Refresh).
+- **Activity bar** (left) — Explorer, Scripts, Show/Hide Explorer, Run current file, Toggle
+  Console; Settings sits in the bottom-left corner.
+- **Console** — output panel with a built-in **mini terminal**: type a shell command at the
+  `❯` prompt to run it (real `/bin/bash`, output streamed live). Toggle with `⌘J` or the
+  activity-bar button.
 - **Scripts** — write your own automations in **JavaScript** or **Python** and run them
   against the current document. Bind **custom keyboard shortcuts** to any script.
 - **Session restore** — reopens your last folder and tabs automatically on launch.
@@ -105,10 +109,17 @@ open build/CleanEdit.app
 
 ## Scripting
 
-Scripts live in `~/Library/Application Support/CleanEdit/scripts/`. The bundled examples
-are copied there on first launch. Use the **Scripts** tab (the `</>` icon in the activity
-bar) to run, create, edit and refresh them. Double-click a script to run it; single-click
-to open it in the editor.
+Scripts live in `~/Library/Application Support/CleanEdit/scripts/`. **You don't have to
+register anything — just drop a `.js` or `.py` file into that folder** and it appears in the
+Scripts panel (opening the Scripts tab refreshes the list; there's also a Refresh button).
+The bundled examples are copied there on first launch. Double-click a script to run it;
+single-click to open it in the editor.
+
+### Extensions
+For customizations that should run automatically at startup, drop `.js`/`.py` files into
+`~/Library/Application Support/CleanEdit/extensions/`. Every file there runs when CleanEdit
+launches (using the same `editor` / `cleanedit` API as scripts), so you can set the NPA mode,
+print a banner, transform buffers, etc. on start.
 
 ### JavaScript API (powered by JavaScriptCore)
 A global `editor` object is available:

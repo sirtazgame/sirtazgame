@@ -38,8 +38,15 @@ Required areas: Explorer (folder tree), main text editor, console, custom script
 - Regex Find: `.*` toggle in the find bar; regex search with `$1` capture templates in replace.
 - NPA legend colors: a `>`...`<` legend block (`color: TAG, TAG`, named or hex) dynamically
   colors each `[TAG]` marker and its data lines; `^` rows shown gray.
-- NPA data modes: script-settable via `cleanedit.set_mode()` / `editor.setMode()`
-  (numbers = all digits, binary = only 0/1, mix = words + numbers); bundled `npa_mode.py`.
+- NPA data modes: script-settable via set_mode (numbers/binary/mix); bundled npa_mode.py.
+- Explorer: New File / New Folder buttons + right-click menu (New File/Folder, Rename,
+  Move to Trash, Reveal in Finder, Refresh); one-click open.
+- Activity bar: Explorer, Scripts, Show/Hide Explorer, Run current file, Toggle Console at
+  top; Settings moved to bottom-left corner.
+- Console mini-terminal: `❯` input runs real /bin/bash commands with live, line-buffered output.
+- Gutter divider line removed (cleaner numbers/text separation, no crossing the tab title).
+- Scripts auto-list from the folder (drop-in, no registration); Scripts tab refreshes on open.
+- Extensions: `.js`/`.py` in ~/Library/Application Support/CleanEdit/extensions/ auto-run at launch.
 - Script shortcuts: bind custom key combos to scripts (right-click → Assign Shortcut); shown
   in the script list, registered as Scripts-menu items, persisted in NSUserDefaults.
 - Session restore: last folder + open tabs + active tab reopened on launch.

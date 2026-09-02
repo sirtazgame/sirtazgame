@@ -29,6 +29,7 @@
 
     NSTextView *_consoleView;
     NSView *_consoleContainer;
+    NSTextField *_consoleInput;
 
     NSStackView *_tabBar;
 
@@ -102,6 +103,7 @@ static void pinFill(NSView *v, NSView *container) {
     if (![self restoreSession]) {
         [self newFile:nil];
     }
+    [[ScriptManager shared] runStartupExtensionsWithHost:self];
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [self->_hSplit setPosition:250 ofDividerAtIndex:0];
@@ -142,7 +144,6 @@ static void pinFill(NSView *v, NSView *container) {
     _hSplit.dividerStyle = NSSplitViewDividerStyleThin;
     [_hSplit addArrangedSubview:_sidebarContainer];
     [_hSplit addArrangedSubview:editorArea];
-    [_sidebarContainer.widthAnchor constraintGreaterThanOrEqualToConstant:170].active = YES;
     [editorArea.widthAnchor constraintGreaterThanOrEqualToConstant:320].active = YES;
 
     [content addSubview:_hSplit];
@@ -161,43 +162,50 @@ static void pinFill(NSView *v, NSView *container) {
     ]];
 }
 
+- (NSButton *)activityButton:(NSString *)symbol tip:(NSString *)tip tag:(NSInteger)tag action:(SEL)action {
+    NSButton *b = [[NSButton alloc] init];
+    b.bordered = NO;
+    b.bezelStyle = NSBezelStyleRegularSquare;
+    b.imagePosition = NSImageOnly;
+    b.image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:tip];
+    b.contentTintColor = [Theme mutedTextColor];
+    b.toolTip = tip;
+    b.tag = tag;
+    b.target = self;
+    b.action = action;
+    [b.widthAnchor constraintEqualToConstant:40].active = YES;
+    [b.heightAnchor constraintEqualToConstant:40].active = YES;
+    return b;
+}
+
 - (NSView *)buildActivityBar {
     NSView *bar = [[NSView alloc] init];
     bar.wantsLayer = YES;
     bar.layer.backgroundColor = [Theme activityBarColor].CGColor;
 
-    _activityButtons = [NSMutableArray array];
-    NSArray *symbols = @[@"folder", @"chevron.left.forwardslash.chevron.right", @"gearshape"];
-    NSArray *tips = @[@"Explorer", @"Scripts", @"Settings"];
+    NSButton *explorer = [self activityButton:@"sidebar.left" tip:@"Explorer" tag:0 action:@selector(activityButtonClicked:)];
+    NSButton *scripts = [self activityButton:@"chevron.left.forwardslash.chevron.right" tip:@"Scripts" tag:1 action:@selector(activityButtonClicked:)];
+    NSButton *settings = [self activityButton:@"gearshape" tip:@"Settings" tag:2 action:@selector(activityButtonClicked:)];
+    _activityButtons = [@[explorer, scripts, settings] mutableCopy];
 
-    NSStackView *stack = [[NSStackView alloc] init];
-    stack.orientation = NSUserInterfaceLayoutOrientationVertical;
-    stack.spacing = 6;
-    stack.alignment = NSLayoutAttributeCenterX;
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    NSButton *run = [self activityButton:@"play.fill" tip:@"Run current file (\u2318R)" tag:-1 action:@selector(runFocusedScript:)];
+    NSButton *console = [self activityButton:@"terminal" tip:@"Toggle console (\u2318J)" tag:-1 action:@selector(toggleConsole:)];
+    NSButton *toggleExp = [self activityButton:@"sidebar.leading" tip:@"Show/Hide explorer" tag:-1 action:@selector(toggleSidebar:)];
 
-    for (NSInteger i = 0; i < symbols.count; i++) {
-        NSButton *b = [[NSButton alloc] init];
-        b.bordered = NO;
-        b.bezelStyle = NSBezelStyleRegularSquare;
-        b.imagePosition = NSImageOnly;
-        NSImage *img = [NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:tips[i]];
-        b.image = img;
-        b.contentTintColor = [Theme mutedTextColor];
-        b.toolTip = tips[i];
-        b.tag = i;
-        b.target = self;
-        b.action = @selector(activityButtonClicked:);
-        [b.widthAnchor constraintEqualToConstant:40].active = YES;
-        [b.heightAnchor constraintEqualToConstant:40].active = YES;
-        [_activityButtons addObject:b];
-        [stack addArrangedSubview:b];
-    }
+    NSStackView *topStack = [NSStackView stackViewWithViews:@[explorer, scripts, toggleExp, run, console]];
+    topStack.orientation = NSUserInterfaceLayoutOrientationVertical;
+    topStack.spacing = 4;
+    topStack.alignment = NSLayoutAttributeCenterX;
+    topStack.translatesAutoresizingMaskIntoConstraints = NO;
 
-    [bar addSubview:stack];
+    [bar addSubview:topStack];
+    [bar addSubview:settings];
+    settings.translatesAutoresizingMaskIntoConstraints = NO;
     [NSLayoutConstraint activateConstraints:@[
-        [stack.topAnchor constraintEqualToAnchor:bar.topAnchor constant:12],
-        [stack.centerXAnchor constraintEqualToAnchor:bar.centerXAnchor],
+        [topStack.topAnchor constraintEqualToAnchor:bar.topAnchor constant:12],
+        [topStack.centerXAnchor constraintEqualToAnchor:bar.centerXAnchor],
+        [settings.centerXAnchor constraintEqualToAnchor:bar.centerXAnchor],
+        [settings.bottomAnchor constraintEqualToAnchor:bar.bottomAnchor constant:-12],
     ]];
     return bar;
 }
@@ -227,7 +235,9 @@ static void pinFill(NSView *v, NSView *container) {
     _explorerPanel = [[NSView alloc] init];
 
     NSTextField *header = [self panelHeader:@"Explorer"];
-    NSButton *openBtn = [self iconButton:@"folder.badge.plus" tip:@"Open Folder" action:@selector(openFolder:)];
+    NSButton *newFileBtn = [self iconButton:@"doc.badge.plus" tip:@"New File" action:@selector(explorerNewFile:)];
+    NSButton *newFolderBtn = [self iconButton:@"folder.badge.plus" tip:@"New Folder" action:@selector(explorerNewFolder:)];
+    NSButton *openBtn = [self iconButton:@"folder" tip:@"Open Folder" action:@selector(openFolder:)];
 
     _outline = [[NSOutlineView alloc] init];
     NSTableColumn *col = [[NSTableColumn alloc] initWithIdentifier:@"main"];
@@ -243,6 +253,17 @@ static void pinFill(NSView *v, NSView *container) {
     _outline.gridStyleMask = NSTableViewGridNone;
     _outline.target = self;
     _outline.action = @selector(outlineClicked:);
+
+    NSMenu *ctx = [[NSMenu alloc] init];
+    [ctx addItemWithTitle:@"New File" action:@selector(explorerNewFile:) keyEquivalent:@""].target = self;
+    [ctx addItemWithTitle:@"New Folder" action:@selector(explorerNewFolder:) keyEquivalent:@""].target = self;
+    [ctx addItem:[NSMenuItem separatorItem]];
+    [ctx addItemWithTitle:@"Rename\u2026" action:@selector(explorerRename:) keyEquivalent:@""].target = self;
+    [ctx addItemWithTitle:@"Move to Trash" action:@selector(explorerDelete:) keyEquivalent:@""].target = self;
+    [ctx addItem:[NSMenuItem separatorItem]];
+    [ctx addItemWithTitle:@"Reveal in Finder" action:@selector(explorerReveal:) keyEquivalent:@""].target = self;
+    [ctx addItemWithTitle:@"Refresh" action:@selector(explorerRefresh:) keyEquivalent:@""].target = self;
+    _outline.menu = ctx;
 
     _tree = [[FileTreeController alloc] init];
     _tree.delegate = self;
@@ -261,7 +282,7 @@ static void pinFill(NSView *v, NSView *container) {
     hint.font = [NSFont systemFontOfSize:11];
     hint.textColor = [Theme mutedTextColor];
 
-    [self layoutPanel:_explorerPanel header:header actionButtons:@[openBtn] body:scroll footer:hint];
+    [self layoutPanel:_explorerPanel header:header actionButtons:@[openBtn, newFolderBtn, newFileBtn] body:scroll footer:hint];
 }
 
 - (void)buildScriptsPanel {
@@ -837,6 +858,34 @@ static void pinFill(NSView *v, NSView *container) {
     scroll.drawsBackground = YES;
     scroll.backgroundColor = [Theme backgroundColor];
 
+    // Mini terminal: a prompt + input that runs real shell commands.
+    NSView *inputRow = [[NSView alloc] init];
+    inputRow.wantsLayer = YES;
+    inputRow.layer.backgroundColor = [Theme sidebarColor].CGColor;
+    NSTextField *promptLbl = [NSTextField labelWithString:@"\u276f"];
+    promptLbl.font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightBold];
+    promptLbl.textColor = [Theme accentColor];
+    _consoleInput = [[NSTextField alloc] init];
+    _consoleInput.placeholderString = @"Run a shell command\u2026";
+    _consoleInput.font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
+    _consoleInput.bezeled = NO;
+    _consoleInput.drawsBackground = NO;
+    _consoleInput.textColor = [Theme textColor];
+    _consoleInput.focusRingType = NSFocusRingTypeNone;
+    _consoleInput.target = self;
+    _consoleInput.action = @selector(runShellCommand:);
+    [inputRow addSubview:promptLbl];
+    [inputRow addSubview:_consoleInput];
+    promptLbl.translatesAutoresizingMaskIntoConstraints = NO;
+    _consoleInput.translatesAutoresizingMaskIntoConstraints = NO;
+    [NSLayoutConstraint activateConstraints:@[
+        [promptLbl.leadingAnchor constraintEqualToAnchor:inputRow.leadingAnchor constant:12],
+        [promptLbl.centerYAnchor constraintEqualToAnchor:inputRow.centerYAnchor],
+        [_consoleInput.leadingAnchor constraintEqualToAnchor:promptLbl.trailingAnchor constant:8],
+        [_consoleInput.trailingAnchor constraintEqualToAnchor:inputRow.trailingAnchor constant:-10],
+        [_consoleInput.centerYAnchor constraintEqualToAnchor:inputRow.centerYAnchor],
+    ]];
+
     [headerBar addSubview:title];
     [headerBar addSubview:clearBtn];
     [headerBar addSubview:hideBtn];
@@ -854,8 +903,10 @@ static void pinFill(NSView *v, NSView *container) {
 
     [container addSubview:headerBar];
     [container addSubview:scroll];
+    [container addSubview:inputRow];
     headerBar.translatesAutoresizingMaskIntoConstraints = NO;
     scroll.translatesAutoresizingMaskIntoConstraints = NO;
+    inputRow.translatesAutoresizingMaskIntoConstraints = NO;
     [NSLayoutConstraint activateConstraints:@[
         [headerBar.topAnchor constraintEqualToAnchor:container.topAnchor],
         [headerBar.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
@@ -864,7 +915,11 @@ static void pinFill(NSView *v, NSView *container) {
         [scroll.topAnchor constraintEqualToAnchor:headerBar.bottomAnchor],
         [scroll.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
         [scroll.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
-        [scroll.bottomAnchor constraintEqualToAnchor:container.bottomAnchor],
+        [scroll.bottomAnchor constraintEqualToAnchor:inputRow.topAnchor],
+        [inputRow.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
+        [inputRow.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+        [inputRow.bottomAnchor constraintEqualToAnchor:container.bottomAnchor],
+        [inputRow.heightAnchor constraintEqualToConstant:30],
     ]];
     return container;
 }
@@ -876,12 +931,18 @@ static void pinFill(NSView *v, NSView *container) {
 }
 
 - (void)selectSidebarIndex:(NSInteger)index {
+    if (_sidebarContainer.hidden) _sidebarContainer.hidden = NO;  // opening a panel reveals the sidebar
     _explorerPanel.hidden = (index != 0);
     _scriptsPanel.hidden = (index != 1);
     _settingsPanel.hidden = (index != 2);
-    for (NSInteger i = 0; i < _activityButtons.count; i++) {
+    for (NSInteger i = 0; i < (NSInteger)_activityButtons.count; i++) {
         _activityButtons[i].contentTintColor = (i == index) ? [Theme textColor] : [Theme mutedTextColor];
     }
+    if (index == 1) [self reloadScripts];  // pick up scripts dropped into the folder
+}
+
+- (void)toggleSidebar:(id)sender {
+    _sidebarContainer.hidden = !_sidebarContainer.hidden;
 }
 
 #pragma mark - Documents & tabs
@@ -1089,6 +1150,74 @@ static void pinFill(NSView *v, NSView *container) {
 
 - (void)fileTreeDidSelectFile:(NSURL *)url { [self openURL:url]; }
 
+#pragma mark - Explorer actions
+
+- (NSString *)promptText:(NSString *)title info:(NSString *)info default:(NSString *)def {
+    NSAlert *a = [[NSAlert alloc] init];
+    a.messageText = title;
+    a.informativeText = info;
+    NSTextField *f = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 240, 24)];
+    f.stringValue = def ?: @"";
+    a.accessoryView = f;
+    [a addButtonWithTitle:@"OK"];
+    [a addButtonWithTitle:@"Cancel"];
+    [a.window setInitialFirstResponder:f];
+    if ([a runModal] != NSAlertFirstButtonReturn) return nil;
+    return [f.stringValue stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+}
+
+- (void)explorerNewFile:(id)sender {
+    NSURL *dir = [_tree selectedDirectoryURL];
+    if (!dir) { [self appendConsole:@"Open a folder first." type:@"info"]; [self openFolder:nil]; return; }
+    NSString *name = [self promptText:@"New File" info:@"File name:" default:@"untitled.txt"];
+    if (!name.length) return;
+    NSURL *u = [dir URLByAppendingPathComponent:name];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:u.path]) {
+        [@"" writeToURL:u atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    }
+    [_tree refresh];
+    [self openURL:u];
+}
+
+- (void)explorerNewFolder:(id)sender {
+    NSURL *dir = [_tree selectedDirectoryURL];
+    if (!dir) { [self appendConsole:@"Open a folder first." type:@"info"]; [self openFolder:nil]; return; }
+    NSString *name = [self promptText:@"New Folder" info:@"Folder name:" default:@"New Folder"];
+    if (!name.length) return;
+    NSURL *u = [dir URLByAppendingPathComponent:name isDirectory:YES];
+    [[NSFileManager defaultManager] createDirectoryAtURL:u withIntermediateDirectories:YES attributes:nil error:nil];
+    [_tree refresh];
+}
+
+- (void)explorerRename:(id)sender {
+    NSURL *u = [_tree clickedOrSelectedURL];
+    if (!u) return;
+    NSString *name = [self promptText:@"Rename" info:@"New name:" default:u.lastPathComponent];
+    if (!name.length || [name isEqualToString:u.lastPathComponent]) return;
+    NSURL *dest = [u.URLByDeletingLastPathComponent URLByAppendingPathComponent:name];
+    [[NSFileManager defaultManager] moveItemAtURL:u toURL:dest error:nil];
+    [_tree refresh];
+}
+
+- (void)explorerDelete:(id)sender {
+    NSURL *u = [_tree clickedOrSelectedURL];
+    if (!u) return;
+    NSAlert *a = [[NSAlert alloc] init];
+    a.messageText = [NSString stringWithFormat:@"Move \u201c%@\u201d to Trash?", u.lastPathComponent];
+    [a addButtonWithTitle:@"Move to Trash"];
+    [a addButtonWithTitle:@"Cancel"];
+    if ([a runModal] != NSAlertFirstButtonReturn) return;
+    [[NSFileManager defaultManager] trashItemAtURL:u resultingItemURL:nil error:nil];
+    [_tree refresh];
+}
+
+- (void)explorerReveal:(id)sender {
+    NSURL *u = [_tree clickedOrSelectedURL] ?: _tree.rootURL;
+    if (u) [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[u]];
+}
+
+- (void)explorerRefresh:(id)sender { [_tree refresh]; }
+
 #pragma mark - NSTextViewDelegate
 
 - (void)textDidChange:(NSNotification *)notification {
@@ -1203,6 +1332,61 @@ static void pinFill(NSView *v, NSView *container) {
 
 - (void)clearConsole:(id)sender {
     [_consoleView.textStorage setAttributedString:[[NSAttributedString alloc] initWithString:@""]];
+}
+
+- (void)runShellCommand:(id)sender {
+    NSString *cmd = [_consoleInput.stringValue stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if (cmd.length == 0) return;
+    _consoleInput.stringValue = @"";
+
+    NSString *cwd = _tree.rootURL ? _tree.rootURL.path : NSHomeDirectory();
+    [self appendConsole:[NSString stringWithFormat:@"\u276f %@", cmd] type:@"info"];
+
+    NSTask *task = [[NSTask alloc] init];
+    task.launchPath = @"/bin/bash";
+    task.arguments = @[@"-lc", cmd];
+    task.currentDirectoryPath = cwd;
+    NSPipe *outPipe = [NSPipe pipe];
+    NSPipe *errPipe = [NSPipe pipe];
+    task.standardOutput = outPipe;
+    task.standardError = errPipe;
+
+    __weak typeof(self) weakSelf = self;
+    __block NSMutableString *outBuf = [NSMutableString string];
+    __block NSMutableString *errBuf = [NSMutableString string];
+    void (^flush)(NSMutableString *, NSString *) = ^(NSMutableString *buf, NSString *kind) {
+        NSRange nl;
+        while ((nl = [buf rangeOfString:@"\n"]).location != NSNotFound) {
+            NSString *line = [buf substringToIndex:nl.location];
+            [buf deleteCharactersInRange:NSMakeRange(0, nl.location + 1)];
+            [weakSelf appendConsole:line type:kind];
+        }
+    };
+    outPipe.fileHandleForReading.readabilityHandler = ^(NSFileHandle *fh) {
+        NSData *d = fh.availableData;
+        if (d.length == 0) return;
+        NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] ?: @"";
+        dispatch_async(dispatch_get_main_queue(), ^{ [outBuf appendString:s]; flush(outBuf, @"output"); });
+    };
+    errPipe.fileHandleForReading.readabilityHandler = ^(NSFileHandle *fh) {
+        NSData *d = fh.availableData;
+        if (d.length == 0) return;
+        NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] ?: @"";
+        dispatch_async(dispatch_get_main_queue(), ^{ [errBuf appendString:s]; flush(errBuf, @"error"); });
+    };
+    task.terminationHandler = ^(NSTask *t) {
+        outPipe.fileHandleForReading.readabilityHandler = nil;
+        errPipe.fileHandleForReading.readabilityHandler = nil;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (outBuf.length) [weakSelf appendConsole:outBuf type:@"output"];
+            if (errBuf.length) [weakSelf appendConsole:errBuf type:@"error"];
+        });
+    };
+    @try {
+        [task launch];
+    } @catch (NSException *ex) {
+        [self appendConsole:[NSString stringWithFormat:@"Failed to run command: %@", ex.reason] type:@"error"];
+    }
 }
 
 - (void)toggleConsole:(id)sender {

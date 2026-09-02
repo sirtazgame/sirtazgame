@@ -21,10 +21,20 @@
     return dir;
 }
 
+- (NSURL *)extensionsDirectory {
+    NSURL *support = [[NSFileManager defaultManager] URLForDirectory:NSApplicationSupportDirectory
+                                                            inDomain:NSUserDomainMask
+                                                   appropriateForURL:nil
+                                                              create:YES
+                                                               error:nil];
+    return [[support URLByAppendingPathComponent:@"CleanEdit"] URLByAppendingPathComponent:@"extensions"];
+}
+
 - (void)ensureScriptsInstalled {
     NSFileManager *fm = [NSFileManager defaultManager];
     NSURL *dir = self.scriptsDirectory;
     [fm createDirectoryAtURL:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    [fm createDirectoryAtURL:self.extensionsDirectory withIntermediateDirectories:YES attributes:nil error:nil];
 
     NSString *bundled = [[NSBundle mainBundle].resourcePath stringByAppendingPathComponent:@"scripts"];
     NSArray *files = [fm contentsOfDirectoryAtPath:bundled error:nil];
@@ -118,6 +128,26 @@
         [host appendConsole:@"Unsupported script type (use .js or .py)." type:@"error"];
     }
 }
+
+- (void)runStartupExtensionsWithHost:(id<EditorHost>)host {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSURL *> *contents = [fm contentsOfDirectoryAtURL:self.extensionsDirectory
+                                  includingPropertiesForKeys:nil options:0 error:nil];
+    NSArray *sorted = [contents sortedArrayUsingComparator:^NSComparisonResult(NSURL *a, NSURL *b) {
+        return [a.lastPathComponent caseInsensitiveCompare:b.lastPathComponent];
+    }];
+    for (NSURL *u in sorted) {
+        NSString *ext = u.pathExtension.lowercaseString;
+        if ([ext isEqualToString:@"js"]) {
+            [host appendConsole:[NSString stringWithFormat:@"extension: %@", u.lastPathComponent] type:@"section"];
+            [JSScriptRunner runScriptAtPath:u.path argument:@"" host:host];
+        } else if ([ext isEqualToString:@"py"]) {
+            [host appendConsole:[NSString stringWithFormat:@"extension: %@", u.lastPathComponent] type:@"section"];
+            [PythonScriptRunner runScriptAtPath:u.path scriptsDir:self.scriptsDirectory.path argument:@"" host:host];
+        }
+    }
+}
+
 
 - (NSURL *)createNewScriptWithName:(NSString *)name {
     NSURL *url = [self.scriptsDirectory URLByAppendingPathComponent:name];

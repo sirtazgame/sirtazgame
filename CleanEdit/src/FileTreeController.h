@@ -11,4 +11,7 @@
 @property (readonly) NSURL *rootURL;
 - (void)setRootURL:(NSURL *)url;
 - (void)reload;
+- (void)refresh;                     // full rebuild from the current root
+- (NSURL *)clickedOrSelectedURL;     // node for context/toolbar actions
+- (NSURL *)selectedDirectoryURL;     // target directory for new file/folder
 @end

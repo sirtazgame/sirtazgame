@@ -32,11 +32,9 @@
     NSTextView *tv = [self textView];
     if (!tv) return;
 
-    // Gutter background + right border line.
+    // Gutter background (no divider line — keeps a clean look next to the text).
     [[Theme backgroundColor] set];
     NSRectFill(self.bounds);
-    [[Theme borderColor] set];
-    NSRectFill(NSMakeRect(self.bounds.size.width - 1, 0, 1, self.bounds.size.height));
 
     NSLayoutManager *lm = tv.layoutManager;
     NSTextContainer *tc = tv.textContainer;
