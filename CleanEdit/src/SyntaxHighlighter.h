@@ -12,11 +12,13 @@
 @property (copy) NSString *blockCommentEnd;
 @property (copy) NSArray<NSString *> *stringDelimiters;
 @property (assign) BOOL functionCalls;
+@property (assign) BOOL autoNumbers;
 @property (copy) NSArray<NSDictionary *> *rules;
 @end
 
 @interface SyntaxHighlighter : NSObject
 + (instancetype)shared;
+@property (copy) NSString *npaMode;   // nil / "numbers" / "binary" / "mix"
 - (LanguageDefinition *)languageForExtension:(NSString *)ext;
 - (void)highlight:(NSTextStorage *)storage language:(LanguageDefinition *)lang;
 @end

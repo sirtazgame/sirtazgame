@@ -29,6 +29,34 @@ grammar highlights `> name.mpa` segment names, `^ ` comments, `##====##` borders
 segment starters. Tweak any of these by editing `Resources/languages/npa.json` /
 `tpa.json` (see the flexible format below) and rebuilding.
 
+### NPA legend colors & data modes
+A `.npa` file can carry a **legend** that drives its own colors. Put a `>` on the first
+legend row and a `<` on the last; between them, write `color: TAG, TAG` lines. The color can
+be a name (`red`, `green`, `blue`, `yellow`, `cyan`, `magenta`, `orange`, `purple`, `pink`,
+`brown`, `gray`, `white`, `black`) or a hex code (`#ff8800`). Each tag's color is applied to
+its `[TAG]` marker **and** the data lines beneath it:
+
+```
+>
+red: FILE, WORD
+#3bd6a0: DATA
+<
+[FILE]
+    [WORD]  [ID]
+    [DATA]
+        0
+        1
+```
+
+The raw data styling is controlled by a **mode** that a Python/JS script sets
+(`cleanedit.set_mode(...)` / `editor.setMode(...)`), matching your Numbers / Mix / Binary
+types:
+- `binary` — only `0`/`1` are colored
+- `numbers` — all digit runs are colored (default)
+- `mix` — both words and numbers are colored
+
+Run the bundled `npa_mode.py` script to switch modes on the fly. `^` rows are shown in gray.
+
 Highlighting is defined by simple JSON files in `Resources/languages/`. To tweak the
 `.npa` / `.tpa` grammars (keywords, comments, section headers, etc.) just edit
 `Resources/languages/npa.json` and `tpa.json` — no recompilation of grammars needed;
@@ -95,6 +123,7 @@ editor.getFilePath()             // path of current file ("" if unsaved)
 editor.getLineCount()            // number of lines
 editor.getArg()                  // value from an @prompt directive (see below)
 editor.log("message")            // print to the console
+editor.setMode("binary")         // .npa data mode: numbers | binary | mix
 console.log("also works")
 ```
 The global `argument` variable also holds the `@prompt` value.
@@ -113,6 +142,7 @@ cleanedit.replace_selection("...")
 sel  = cleanedit.get_selection()
 path = cleanedit.get_file_path()
 arg  = cleanedit.get_arg()        # value from an @prompt directive (see below)
+cleanedit.set_mode("binary")      # .npa data mode: numbers | binary | mix
 ```
 Anything printed with `print()` also appears in the console. Python scripts run in a
 subprocess, so `import`-ing any installed package works normally.

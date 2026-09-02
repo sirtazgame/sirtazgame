@@ -52,6 +52,7 @@
     NSTextField *_replaceField;
     NSTextField *_matchLabel;
     NSButton *_caseButton;
+    NSButton *_regexButton;
     NSMutableArray<NSValue *> *_matches;
     NSInteger _matchIndex;
     BOOL _findVisible;
@@ -558,6 +559,10 @@ static void pinFill(NSView *v, NSView *container) {
     [_caseButton setButtonType:NSButtonTypePushOnPushOff];
     _caseButton.toolTip = @"Case sensitive";
 
+    _regexButton = [self barButton:@".*" action:@selector(toggleCaseSensitive:)];
+    [_regexButton setButtonType:NSButtonTypePushOnPushOff];
+    _regexButton.toolTip = @"Regular expression";
+
     _matchLabel = [NSTextField labelWithString:@""];
     _matchLabel.font = [NSFont systemFontOfSize:11];
     _matchLabel.textColor = [Theme mutedTextColor];
@@ -567,7 +572,7 @@ static void pinFill(NSView *v, NSView *container) {
     NSButton *replaceAllBtn = [self barButton:@"All" action:@selector(replaceAll:)];
     NSButton *closeBtn = [self barButton:@"\u2715" action:@selector(closeFindBar:)];
 
-    NSStackView *row1 = [NSStackView stackViewWithViews:@[_findField, prev, next, _caseButton, _matchLabel]];
+    NSStackView *row1 = [NSStackView stackViewWithViews:@[_findField, prev, next, _caseButton, _regexButton, _matchLabel]];
     row1.spacing = 6;
     NSStackView *row2 = [NSStackView stackViewWithViews:@[_replaceField, replaceBtn, replaceAllBtn, closeBtn]];
     row2.spacing = 6;
@@ -641,15 +646,29 @@ static void pinFill(NSView *v, NSView *container) {
     if (needle.length == 0) { _matchLabel.stringValue = @""; return; }
 
     NSString *hay = _editorView.string;
-    NSStringCompareOptions opts = (_caseButton.state == NSControlStateValueOn) ? 0 : NSCaseInsensitiveSearch;
-    NSRange search = NSMakeRange(0, hay.length);
-    while (search.length > 0) {
-        NSRange r = [hay rangeOfString:needle options:opts range:search];
-        if (r.location == NSNotFound) break;
-        [_matches addObject:[NSValue valueWithRange:r]];
-        NSUInteger nextLoc = r.location + MAX(r.length, (NSUInteger)1);
-        if (nextLoc >= hay.length) break;
-        search = NSMakeRange(nextLoc, hay.length - nextLoc);
+    BOOL caseSensitive = (_caseButton.state == NSControlStateValueOn);
+
+    if (_regexButton.state == NSControlStateValueOn) {
+        NSRegularExpressionOptions ropts = 0;
+        if (!caseSensitive) ropts |= NSRegularExpressionCaseInsensitive;
+        NSError *err = nil;
+        NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:needle options:ropts error:&err];
+        if (!re) { _matchLabel.stringValue = @"Bad regex"; return; }
+        [re enumerateMatchesInString:hay options:0 range:NSMakeRange(0, hay.length)
+                          usingBlock:^(NSTextCheckingResult *m, NSMatchingFlags flags, BOOL *stop) {
+            if (m.range.length > 0) [_matches addObject:[NSValue valueWithRange:m.range]];
+        }];
+    } else {
+        NSStringCompareOptions opts = caseSensitive ? 0 : NSCaseInsensitiveSearch;
+        NSRange search = NSMakeRange(0, hay.length);
+        while (search.length > 0) {
+            NSRange r = [hay rangeOfString:needle options:opts range:search];
+            if (r.location == NSNotFound) break;
+            [_matches addObject:[NSValue valueWithRange:r]];
+            NSUInteger nextLoc = r.location + MAX(r.length, (NSUInteger)1);
+            if (nextLoc >= hay.length) break;
+            search = NSMakeRange(nextLoc, hay.length - nextLoc);
+        }
     }
     [self highlightAllMatches];
 
@@ -695,6 +714,17 @@ static void pinFill(NSView *v, NSView *container) {
     if (_matches.count == 0 || _matchIndex >= (NSInteger)_matches.count) return;
     NSRange r = [_matches[_matchIndex] rangeValue];
     NSString *rep = _replaceField.stringValue ?: @"";
+
+    if (_regexButton.state == NSControlStateValueOn) {
+        NSRegularExpressionOptions ropts = 0;
+        if (_caseButton.state != NSControlStateValueOn) ropts |= NSRegularExpressionCaseInsensitive;
+        NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:_findField.stringValue options:ropts error:nil];
+        if (re) {
+            NSString *matched = [_editorView.string substringWithRange:r];
+            rep = [re stringByReplacingMatchesInString:matched options:0
+                                                 range:NSMakeRange(0, matched.length) withTemplate:rep];
+        }
+    }
     if ([_editorView shouldChangeTextInRange:r replacementString:rep]) {
         [_editorView.textStorage replaceCharactersInRange:r withString:rep];
         [_editorView didChangeText];
@@ -715,9 +745,20 @@ static void pinFill(NSView *v, NSView *container) {
     if (needle.length == 0) return;
     NSString *rep = _replaceField.stringValue ?: @"";
     NSString *hay = _editorView.string;
-    NSStringCompareOptions opts = (_caseButton.state == NSControlStateValueOn) ? 0 : NSCaseInsensitiveSearch;
     NSMutableString *ms = [hay mutableCopy];
-    NSUInteger count = [ms replaceOccurrencesOfString:needle withString:rep options:opts range:NSMakeRange(0, ms.length)];
+    NSUInteger count = 0;
+
+    if (_regexButton.state == NSControlStateValueOn) {
+        NSRegularExpressionOptions ropts = 0;
+        if (_caseButton.state != NSControlStateValueOn) ropts |= NSRegularExpressionCaseInsensitive;
+        NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:needle options:ropts error:nil];
+        if (!re) { [self appendConsole:@"Bad regex - nothing replaced." type:@"error"]; return; }
+        count = [re replaceMatchesInString:ms options:0 range:NSMakeRange(0, ms.length) withTemplate:rep];
+    } else {
+        NSStringCompareOptions opts = (_caseButton.state == NSControlStateValueOn) ? 0 : NSCaseInsensitiveSearch;
+        count = [ms replaceOccurrencesOfString:needle withString:rep options:opts range:NSMakeRange(0, ms.length)];
+    }
+
     if (count > 0) {
         NSRange full = NSMakeRange(0, hay.length);
         if ([_editorView shouldChangeTextInRange:full replacementString:ms]) {
@@ -1112,6 +1153,12 @@ static void pinFill(NSView *v, NSView *container) {
 - (NSString *)currentFilePath {
     OpenDocument *doc = [self currentDoc];
     return doc.url ? doc.url.path : @"";
+}
+
+- (void)setHighlightMode:(NSString *)mode {
+    [SyntaxHighlighter shared].npaMode = mode.lowercaseString;
+    [self rehighlight];
+    [self appendConsole:[NSString stringWithFormat:@"Highlight mode set to '%@'.", mode] type:@"info"];
 }
 
 - (NSInteger)editorLineCount {

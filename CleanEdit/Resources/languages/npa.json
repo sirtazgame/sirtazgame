@@ -2,7 +2,10 @@
   "name": "NPA",
   "extensions": ["npa"],
   "lineComment": "##",
+  "numbers": false,
   "rules": [
+    { "pattern": "^[ \\t]*\\^.*$", "type": "border", "multiline": true },
+    { "pattern": "\\^", "type": "border" },
     { "pattern": "^[ \\t]*[><].*$", "type": "function", "multiline": true },
     { "pattern": "\\[[A-Za-z_][A-Za-z0-9_]*\\]", "type": "keyword" },
     { "pattern": "\\[[0-9]+\\]", "type": "attribute" },

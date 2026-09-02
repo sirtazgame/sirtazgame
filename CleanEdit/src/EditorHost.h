@@ -10,5 +10,6 @@
 - (void)insertEditorText:(NSString *)text;
 - (NSString *)currentFilePath;
 - (NSInteger)editorLineCount;
+- (void)setHighlightMode:(NSString *)mode;
 - (void)appendConsole:(NSString *)text type:(NSString *)type;
 @end

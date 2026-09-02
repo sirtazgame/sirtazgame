@@ -34,8 +34,12 @@ Required areas: Explorer (folder tree), main text editor, console, custom script
   named + `[0-9]` numeric-id markers, `>`/`<` legend rows, binary/number data; TPA
   `> name.mpa` segment names, `^ ` comments, `##====##` borders, `>>` segment starters.
   Added a "border" (grey) theme token.
-- Console: each script run emits a labelled section header (name + timestamp) so runs are
-  easy to tell apart.
+- Console: each script run emits a labelled section header (name + timestamp).
+- Regex Find: `.*` toggle in the find bar; regex search with `$1` capture templates in replace.
+- NPA legend colors: a `>`...`<` legend block (`color: TAG, TAG`, named or hex) dynamically
+  colors each `[TAG]` marker and its data lines; `^` rows shown gray.
+- NPA data modes: script-settable via `cleanedit.set_mode()` / `editor.setMode()`
+  (numbers = all digits, binary = only 0/1, mix = words + numbers); bundled `npa_mode.py`.
 - Script shortcuts: bind custom key combos to scripts (right-click → Assign Shortcut); shown
   in the script list, registered as Scripts-menu items, persisted in NSUserDefaults.
 - Session restore: last folder + open tabs + active tab reopened on launch.

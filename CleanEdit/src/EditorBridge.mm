@@ -31,6 +31,10 @@
     [_host appendConsole:message ?: @"" type:@"output"];
 }
 
+- (void)setMode:(NSString *)mode {
+    [_host setHighlightMode:mode ?: @""];
+}
+
 - (void)applyCommand:(NSDictionary *)cmd {
     NSString *action = cmd[@"action"];
     NSString *value = cmd[@"value"] ?: @"";
@@ -42,6 +46,8 @@
         [self replaceSelection:value];
     } else if ([action isEqualToString:@"log"]) {
         [self log:value];
+    } else if ([action isEqualToString:@"setMode"]) {
+        [self setMode:value];
     }
 }
 

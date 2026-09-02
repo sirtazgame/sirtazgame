@@ -46,6 +46,7 @@
         d.blockCommentEnd = dict[@"blockCommentEnd"];
         d.stringDelimiters = dict[@"stringDelimiters"] ?: @[];
         d.functionCalls = [dict[@"functionCalls"] boolValue];
+        d.autoNumbers = dict[@"numbers"] ? [dict[@"numbers"] boolValue] : YES;
         d.rules = dict[@"rules"] ?: @[];
 
         for (NSString *ext in d.extensions) {
@@ -129,8 +130,10 @@
         }
 
         // Numbers.
-        [self applyPattern:@"\\b\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?\\b"
-                     token:@"number" group:0 multiline:NO storage:storage text:text];
+        if (lang.autoNumbers) {
+            [self applyPattern:@"\\b\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?\\b"
+                         token:@"number" group:0 multiline:NO storage:storage text:text];
+        }
 
         // Strings (override earlier tokens inside them).
         for (NSString *delim in lang.stringDelimiters) {
@@ -153,7 +156,150 @@
         }
     }
 
+    if ([lang.name isEqualToString:@"NPA"]) {
+        [self applyNPA:storage text:text];
+    }
+
     [storage endEditing];
+}
+
+- (NSColor *)npaColorFromString:(NSString *)raw {
+    NSString *s = [[raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] lowercaseString];
+    if (s.length == 0) return nil;
+    if ([s hasPrefix:@"#"]) {
+        NSString *hex = [s substringFromIndex:1];
+        if (hex.length == 3) {
+            NSString *r = [hex substringWithRange:NSMakeRange(0, 1)];
+            NSString *g = [hex substringWithRange:NSMakeRange(1, 1)];
+            NSString *b = [hex substringWithRange:NSMakeRange(2, 1)];
+            hex = [NSString stringWithFormat:@"%@%@%@%@%@%@", r, r, g, g, b, b];
+        }
+        if (hex.length != 6) return nil;
+        unsigned int val = 0;
+        [[NSScanner scannerWithString:hex] scanHexInt:&val];
+        return [NSColor colorWithSRGBRed:((val >> 16) & 0xff) / 255.0
+                                   green:((val >> 8) & 0xff) / 255.0
+                                    blue:(val & 0xff) / 255.0 alpha:1.0];
+    }
+    static NSDictionary *named = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        named = @{
+            @"red": [NSColor colorWithSRGBRed:0.90 green:0.30 blue:0.30 alpha:1],
+            @"green": [NSColor colorWithSRGBRed:0.40 green:0.80 blue:0.40 alpha:1],
+            @"blue": [NSColor colorWithSRGBRed:0.35 green:0.60 blue:0.95 alpha:1],
+            @"yellow": [NSColor colorWithSRGBRed:0.90 green:0.85 blue:0.35 alpha:1],
+            @"cyan": [NSColor colorWithSRGBRed:0.35 green:0.82 blue:0.82 alpha:1],
+            @"magenta": [NSColor colorWithSRGBRed:0.85 green:0.40 blue:0.80 alpha:1],
+            @"orange": [NSColor colorWithSRGBRed:0.95 green:0.60 blue:0.25 alpha:1],
+            @"purple": [NSColor colorWithSRGBRed:0.70 green:0.50 blue:0.90 alpha:1],
+            @"pink": [NSColor colorWithSRGBRed:0.95 green:0.55 blue:0.75 alpha:1],
+            @"brown": [NSColor colorWithSRGBRed:0.70 green:0.50 blue:0.35 alpha:1],
+            @"gray": [NSColor colorWithSRGBRed:0.60 green:0.60 blue:0.60 alpha:1],
+            @"grey": [NSColor colorWithSRGBRed:0.60 green:0.60 blue:0.60 alpha:1],
+            @"white": [NSColor colorWithSRGBRed:0.92 green:0.92 blue:0.92 alpha:1],
+            @"black": [NSColor colorWithSRGBRed:0.20 green:0.20 blue:0.20 alpha:1],
+        };
+    });
+    return named[s];
+}
+
+- (void)npaParseLegendLine:(NSString *)line into:(NSMutableDictionary<NSString *, NSColor *> *)map {
+    NSRange colon = [line rangeOfString:@":"];
+    if (colon.location == NSNotFound) return;
+    NSColor *col = [self npaColorFromString:[line substringToIndex:colon.location]];
+    if (!col) return;
+    NSString *tagsStr = [line substringFromIndex:colon.location + 1];
+    for (NSString *raw in [tagsStr componentsSeparatedByString:@","]) {
+        NSString *tag = [raw stringByReplacingOccurrencesOfString:@"[" withString:@""];
+        tag = [tag stringByReplacingOccurrencesOfString:@"]" withString:@""];
+        tag = [[tag stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] uppercaseString];
+        if (tag.length) map[tag] = col;
+    }
+}
+
+// Dynamic per-file NPA coloring: legend (`> ... <`) drives tag/data colors, and the
+// script-set mode (numbers/binary/mix) styles the raw data values.
+- (void)applyNPA:(NSTextStorage *)storage text:(NSString *)text {
+    NSCharacterSet *ws = [NSCharacterSet whitespaceCharacterSet];
+    NSArray<NSString *> *lines = [text componentsSeparatedByString:@"\n"];
+
+    // Parse legend region: first line starting with '>' to next line starting with '<'.
+    NSMutableDictionary<NSString *, NSColor *> *tagColors = [NSMutableDictionary dictionary];
+    NSInteger lstart = -1, lend = -1;
+    for (NSInteger i = 0; i < (NSInteger)lines.count; i++) {
+        NSString *t = [lines[i] stringByTrimmingCharactersInSet:ws];
+        if (lstart < 0) { if ([t hasPrefix:@">"]) lstart = i; }
+        else { if ([t hasPrefix:@"<"]) { lend = i; break; } }
+    }
+    if (lstart >= 0 && lend > lstart) {
+        for (NSInteger i = lstart + 1; i < lend; i++) {
+            [self npaParseLegendLine:lines[i] into:tagColors];
+        }
+    }
+
+    NSColor *numColor = [Theme colorForToken:@"number"];
+    NSColor *wordColor = [Theme colorForToken:@"type"];
+    NSString *mode = [self.npaMode lowercaseString] ?: @"";
+
+    NSRegularExpression *tagRe = [NSRegularExpression regularExpressionWithPattern:@"\\[([^\\]]+)\\]" options:0 error:nil];
+    NSRegularExpression *digitsRe = [NSRegularExpression regularExpressionWithPattern:@"\\d+" options:0 error:nil];
+    NSRegularExpression *binRe = [NSRegularExpression regularExpressionWithPattern:@"[01]" options:0 error:nil];
+    NSRegularExpression *wordRe = [NSRegularExpression regularExpressionWithPattern:@"[A-Za-z_][A-Za-z0-9_]*" options:0 error:nil];
+
+    NSColor *active = nil;
+    NSUInteger offset = 0;
+    for (NSString *line in lines) {
+        NSUInteger len = line.length;
+        NSUInteger lineStart = offset;
+        offset += len + 1;  // account for the '\n'
+
+        NSString *t = [line stringByTrimmingCharactersInSet:ws];
+        if (t.length == 0) { active = nil; continue; }
+        unichar c0 = [t characterAtIndex:0];
+        if ([t hasPrefix:@"##"] || c0 == '^' || c0 == '>' || c0 == '<') continue;
+
+        if (c0 == '[') {
+            // Marker line: apply legend colors to recognized tags, set active section color.
+            __block NSColor *lineActive = nil;
+            [tagRe enumerateMatchesInString:line options:0 range:NSMakeRange(0, len)
+                                 usingBlock:^(NSTextCheckingResult *m, NSMatchingFlags f, BOOL *stop) {
+                NSString *name = [[line substringWithRange:[m rangeAtIndex:1]] uppercaseString];
+                NSColor *col = tagColors[name];
+                if (col) {
+                    [storage addAttribute:NSForegroundColorAttributeName value:col
+                                    range:NSMakeRange(lineStart + m.range.location, m.range.length)];
+                    lineActive = col;
+                }
+            }];
+            active = lineActive;
+            continue;
+        }
+
+        // Data line.
+        NSRange lineRange = NSMakeRange(lineStart, len);
+        if (active) {
+            NSUInteger a = 0; while (a < len && [ws characterIsMember:[line characterAtIndex:a]]) a++;
+            NSUInteger b = len; while (b > a && [ws characterIsMember:[line characterAtIndex:b - 1]]) b--;
+            if (b > a) [storage addAttribute:NSForegroundColorAttributeName value:active
+                                       range:NSMakeRange(lineStart + a, b - a)];
+        } else {
+            void (^colorWith)(NSRegularExpression *, NSColor *) = ^(NSRegularExpression *re, NSColor *col) {
+                [re enumerateMatchesInString:text options:0 range:lineRange
+                                  usingBlock:^(NSTextCheckingResult *m, NSMatchingFlags f, BOOL *stop) {
+                    [storage addAttribute:NSForegroundColorAttributeName value:col range:m.range];
+                }];
+            };
+            if ([mode isEqualToString:@"binary"]) {
+                colorWith(binRe, numColor);
+            } else if ([mode isEqualToString:@"mix"]) {
+                colorWith(wordRe, wordColor);
+                colorWith(digitsRe, numColor);
+            } else {
+                colorWith(digitsRe, numColor);
+            }
+        }
+    }
 }
 
 @end

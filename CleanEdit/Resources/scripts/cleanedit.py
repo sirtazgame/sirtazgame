@@ -67,3 +67,8 @@ def replace_selection(text):
 def log(message):
     """Print a message to the CleanEdit console."""
     _send({"action": "log", "value": str(message)})
+
+
+def set_mode(mode):
+    """Set the .npa data highlighting mode: 'numbers', 'binary' or 'mix'."""
+    _send({"action": "setMode", "value": str(mode)})

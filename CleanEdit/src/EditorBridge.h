@@ -12,6 +12,7 @@
 - (NSString *)getFilePath;
 - (NSInteger)getLineCount;
 - (NSString *)getArg;
+- (void)setMode:(NSString *)mode;
 - (void)log:(NSString *)message;
 @end
 
