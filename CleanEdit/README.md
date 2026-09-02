@@ -87,9 +87,11 @@ editor.replaceSelection("...")   // replace the selection
 editor.insertText("...")         // insert at the cursor
 editor.getFilePath()             // path of current file ("" if unsaved)
 editor.getLineCount()            // number of lines
+editor.getArg()                  // value from an @prompt directive (see below)
 editor.log("message")            // print to the console
 console.log("also works")
 ```
+The global `argument` variable also holds the `@prompt` value.
 
 ### Python API
 Import the bundled `cleanedit` module:
@@ -104,9 +106,26 @@ cleanedit.insert("...")
 cleanedit.replace_selection("...")
 sel  = cleanedit.get_selection()
 path = cleanedit.get_file_path()
+arg  = cleanedit.get_arg()        # value from an @prompt directive (see below)
 ```
 Anything printed with `print()` also appears in the console. Python scripts run in a
 subprocess, so `import`-ing any installed package works normally.
+
+### Script arguments (`@prompt`)
+Add a directive comment near the top of a script and CleanEdit will ask for a value
+before running it, passing it to the script:
+
+```python
+# @prompt: What is your name?
+import cleanedit
+cleanedit.insert("Hello, " + (cleanedit.get_arg() or "world") + "!")
+```
+```js
+// @prompt: Wrap selection with tag
+editor.replaceSelection("<" + argument + ">" + editor.getSelection() + "</" + argument + ">");
+```
+This works whether the script is run from the panel or via a keyboard shortcut. Cancelling
+the prompt cancels the run.
 
 You can also press `⌘R` to run the currently focused editor buffer as a script.
 
@@ -127,6 +146,9 @@ use **Clear Shortcut** to remove one.
 | Close tab | `⌘W` |
 | Toggle console | `⌘J` |
 | Run current file as script | `⌘R` |
+| Find | `⌘F` |
+| Find next / previous | `⌘G` / `⇧⌘G` |
+| Go to line | `⌘L` |
 
 ## Project layout
 ```

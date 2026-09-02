@@ -44,6 +44,17 @@
     BOOL _consoleVisible;
     BOOL _updatingEditor;
     BOOL _restoring;
+
+    // Find & Replace
+    NSView *_findBar;
+    NSLayoutConstraint *_findBarHeight;
+    NSTextField *_findField;
+    NSTextField *_replaceField;
+    NSTextField *_matchLabel;
+    NSButton *_caseButton;
+    NSMutableArray<NSValue *> *_matches;
+    NSInteger _matchIndex;
+    BOOL _findVisible;
 }
 @end
 
@@ -468,19 +479,29 @@ static void pinFill(NSView *v, NSView *container) {
     _editorScroll.hasVerticalRuler = YES;
     _editorScroll.rulersVisible = YES;
 
+    _findBar = [self buildFindBar];
+
     [editorContainer addSubview:tabScroll];
+    [editorContainer addSubview:_findBar];
     [editorContainer addSubview:_editorScroll];
     _editorScroll.translatesAutoresizingMaskIntoConstraints = NO;
+    _findBar.translatesAutoresizingMaskIntoConstraints = NO;
+    _findBarHeight = [_findBar.heightAnchor constraintEqualToConstant:0];
     [NSLayoutConstraint activateConstraints:@[
         [tabScroll.topAnchor constraintEqualToAnchor:editorContainer.topAnchor],
         [tabScroll.leadingAnchor constraintEqualToAnchor:editorContainer.leadingAnchor],
         [tabScroll.trailingAnchor constraintEqualToAnchor:editorContainer.trailingAnchor],
         [tabScroll.heightAnchor constraintEqualToConstant:36],
-        [_editorScroll.topAnchor constraintEqualToAnchor:tabScroll.bottomAnchor],
+        [_findBar.topAnchor constraintEqualToAnchor:tabScroll.bottomAnchor],
+        [_findBar.leadingAnchor constraintEqualToAnchor:editorContainer.leadingAnchor],
+        [_findBar.trailingAnchor constraintEqualToAnchor:editorContainer.trailingAnchor],
+        _findBarHeight,
+        [_editorScroll.topAnchor constraintEqualToAnchor:_findBar.bottomAnchor],
         [_editorScroll.leadingAnchor constraintEqualToAnchor:editorContainer.leadingAnchor],
         [_editorScroll.trailingAnchor constraintEqualToAnchor:editorContainer.trailingAnchor],
         [_editorScroll.bottomAnchor constraintEqualToAnchor:editorContainer.bottomAnchor],
     ]];
+    _findBar.hidden = YES;
 
     // Console
     _consoleContainer = [self buildConsole];
@@ -495,6 +516,256 @@ static void pinFill(NSView *v, NSView *container) {
 
     [self applyEditorSettings];
     return _vSplit;
+}
+
+- (NSButton *)barButton:(NSString *)title action:(SEL)action {
+    NSButton *b = [[NSButton alloc] init];
+    b.title = title;
+    b.bezelStyle = NSBezelStyleRounded;
+    b.controlSize = NSControlSizeSmall;
+    b.font = [NSFont systemFontOfSize:11];
+    b.target = self;
+    b.action = action;
+    return b;
+}
+
+- (NSTextField *)barField:(NSString *)placeholder {
+    NSTextField *f = [[NSTextField alloc] init];
+    f.placeholderString = placeholder;
+    f.font = [NSFont systemFontOfSize:12];
+    f.controlSize = NSControlSizeSmall;
+    f.bezeled = YES;
+    f.delegate = self;
+    [f.widthAnchor constraintEqualToConstant:200].active = YES;
+    return f;
+}
+
+- (NSView *)buildFindBar {
+    NSView *bar = [[NSView alloc] init];
+    bar.wantsLayer = YES;
+    bar.layer.backgroundColor = [Theme sidebarColor].CGColor;
+
+    _findField = [self barField:@"Find"];
+    _findField.target = self;
+    _findField.action = @selector(findNext:);
+    _replaceField = [self barField:@"Replace"];
+    _replaceField.target = self;
+    _replaceField.action = @selector(replaceCurrent:);
+
+    NSButton *prev = [self barButton:@"\u2039" action:@selector(findPrevious:)];
+    NSButton *next = [self barButton:@"\u203A" action:@selector(findNext:)];
+    _caseButton = [self barButton:@"Aa" action:@selector(toggleCaseSensitive:)];
+    [_caseButton setButtonType:NSButtonTypePushOnPushOff];
+    _caseButton.toolTip = @"Case sensitive";
+
+    _matchLabel = [NSTextField labelWithString:@""];
+    _matchLabel.font = [NSFont systemFontOfSize:11];
+    _matchLabel.textColor = [Theme mutedTextColor];
+    [_matchLabel.widthAnchor constraintGreaterThanOrEqualToConstant:70].active = YES;
+
+    NSButton *replaceBtn = [self barButton:@"Replace" action:@selector(replaceCurrent:)];
+    NSButton *replaceAllBtn = [self barButton:@"All" action:@selector(replaceAll:)];
+    NSButton *closeBtn = [self barButton:@"\u2715" action:@selector(closeFindBar:)];
+
+    NSStackView *row1 = [NSStackView stackViewWithViews:@[_findField, prev, next, _caseButton, _matchLabel]];
+    row1.spacing = 6;
+    NSStackView *row2 = [NSStackView stackViewWithViews:@[_replaceField, replaceBtn, replaceAllBtn, closeBtn]];
+    row2.spacing = 6;
+
+    NSStackView *rows = [NSStackView stackViewWithViews:@[row1, row2]];
+    rows.orientation = NSUserInterfaceLayoutOrientationVertical;
+    rows.alignment = NSLayoutAttributeLeading;
+    rows.spacing = 6;
+    rows.translatesAutoresizingMaskIntoConstraints = NO;
+    [bar addSubview:rows];
+    [NSLayoutConstraint activateConstraints:@[
+        [rows.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor constant:10],
+        [rows.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+    ]];
+    return bar;
+}
+
+#pragma mark - Find & Replace
+
+- (void)showFindBar:(id)sender {
+    NSString *sel = [self editorSelection];
+    if (sel.length > 0 && sel.length < 200) _findField.stringValue = sel;
+    _findBar.hidden = NO;
+    _findBarHeight.constant = 68;
+    _findVisible = YES;
+    [_window makeFirstResponder:_findField];
+    [[_findField currentEditor] selectAll:nil];
+    [self performFind:YES];
+}
+
+- (void)closeFindBar:(id)sender {
+    _findBarHeight.constant = 0;
+    _findBar.hidden = YES;
+    _findVisible = NO;
+    [self clearFindHighlights];
+    [_window makeFirstResponder:_editorView];
+}
+
+- (void)toggleCaseSensitive:(id)sender { [self performFind:YES]; }
+
+- (void)controlTextDidChange:(NSNotification *)obj {
+    if (obj.object == _findField) [self performFind:YES];
+}
+
+- (BOOL)control:(NSControl *)control textView:(NSTextView *)textView doCommandBySelector:(SEL)commandSelector {
+    if ((control == _findField || control == _replaceField) && commandSelector == @selector(cancelOperation:)) {
+        [self closeFindBar:nil];
+        return YES;
+    }
+    return NO;
+}
+
+- (void)clearFindHighlights {
+    NSLayoutManager *lm = _editorView.layoutManager;
+    [lm removeTemporaryAttribute:NSBackgroundColorAttributeName
+              forCharacterRange:NSMakeRange(0, _editorView.string.length)];
+}
+
+- (void)highlightAllMatches {
+    NSLayoutManager *lm = _editorView.layoutManager;
+    NSColor *bg = [NSColor colorWithSRGBRed:0.60 green:0.50 blue:0.10 alpha:0.55];
+    for (NSValue *v in _matches) {
+        [lm addTemporaryAttribute:NSBackgroundColorAttributeName value:bg forCharacterRange:v.rangeValue];
+    }
+}
+
+- (void)performFind:(BOOL)moveSelection {
+    [self clearFindHighlights];
+    _matches = [NSMutableArray array];
+    NSString *needle = _findField.stringValue;
+    if (needle.length == 0) { _matchLabel.stringValue = @""; return; }
+
+    NSString *hay = _editorView.string;
+    NSStringCompareOptions opts = (_caseButton.state == NSControlStateValueOn) ? 0 : NSCaseInsensitiveSearch;
+    NSRange search = NSMakeRange(0, hay.length);
+    while (search.length > 0) {
+        NSRange r = [hay rangeOfString:needle options:opts range:search];
+        if (r.location == NSNotFound) break;
+        [_matches addObject:[NSValue valueWithRange:r]];
+        NSUInteger nextLoc = r.location + MAX(r.length, (NSUInteger)1);
+        if (nextLoc >= hay.length) break;
+        search = NSMakeRange(nextLoc, hay.length - nextLoc);
+    }
+    [self highlightAllMatches];
+
+    if (moveSelection && _matches.count > 0) {
+        _matchIndex = 0;
+        [self selectMatchAtIndex:0];
+    }
+    [self updateMatchLabel];
+}
+
+- (void)selectMatchAtIndex:(NSInteger)index {
+    if (index < 0 || index >= (NSInteger)_matches.count) return;
+    NSRange r = [_matches[index] rangeValue];
+    [_editorView setSelectedRange:r];
+    [_editorView scrollRangeToVisible:r];
+    [_editorView showFindIndicatorForRange:r];
+    [self updateMatchLabel];
+}
+
+- (void)updateMatchLabel {
+    if (_matches.count == 0) {
+        _matchLabel.stringValue = _findField.stringValue.length ? @"No results" : @"";
+    } else {
+        _matchLabel.stringValue = [NSString stringWithFormat:@"%ld of %ld",
+                                   (long)(_matchIndex + 1), (long)_matches.count];
+    }
+}
+
+- (void)findNext:(id)sender {
+    if (!_findVisible) { [self showFindBar:sender]; return; }
+    if (_matches.count == 0) { [self performFind:YES]; return; }
+    _matchIndex = (_matchIndex + 1) % _matches.count;
+    [self selectMatchAtIndex:_matchIndex];
+}
+
+- (void)findPrevious:(id)sender {
+    if (_matches.count == 0) { [self performFind:YES]; return; }
+    _matchIndex = (_matchIndex - 1 + _matches.count) % _matches.count;
+    [self selectMatchAtIndex:_matchIndex];
+}
+
+- (void)replaceCurrent:(id)sender {
+    if (_matches.count == 0 || _matchIndex >= (NSInteger)_matches.count) return;
+    NSRange r = [_matches[_matchIndex] rangeValue];
+    NSString *rep = _replaceField.stringValue ?: @"";
+    if ([_editorView shouldChangeTextInRange:r replacementString:rep]) {
+        [_editorView.textStorage replaceCharactersInRange:r withString:rep];
+        [_editorView didChangeText];
+    }
+    [self rehighlight];
+    NSInteger keep = _matchIndex;
+    [self performFind:NO];
+    if (_matches.count > 0) {
+        _matchIndex = MIN(keep, (NSInteger)_matches.count - 1);
+        [self selectMatchAtIndex:_matchIndex];
+    } else {
+        [self updateMatchLabel];
+    }
+}
+
+- (void)replaceAll:(id)sender {
+    NSString *needle = _findField.stringValue;
+    if (needle.length == 0) return;
+    NSString *rep = _replaceField.stringValue ?: @"";
+    NSString *hay = _editorView.string;
+    NSStringCompareOptions opts = (_caseButton.state == NSControlStateValueOn) ? 0 : NSCaseInsensitiveSearch;
+    NSMutableString *ms = [hay mutableCopy];
+    NSUInteger count = [ms replaceOccurrencesOfString:needle withString:rep options:opts range:NSMakeRange(0, ms.length)];
+    if (count > 0) {
+        NSRange full = NSMakeRange(0, hay.length);
+        if ([_editorView shouldChangeTextInRange:full replacementString:ms]) {
+            [_editorView.textStorage replaceCharactersInRange:full withString:ms];
+            [_editorView didChangeText];
+        }
+        [self rehighlight];
+        [self performFind:NO];
+    }
+    [self appendConsole:[NSString stringWithFormat:@"Replaced %lu occurrence%@.",
+                         (unsigned long)count, count == 1 ? @"" : @"s"] type:@"info"];
+}
+
+#pragma mark - Go to line
+
+- (void)gotoLine:(id)sender {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"Go to Line";
+    alert.informativeText = [NSString stringWithFormat:@"Enter a line number (1 - %ld):", (long)[self editorLineCount]];
+    NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 120, 24)];
+    alert.accessoryView = input;
+    [alert addButtonWithTitle:@"Go"];
+    [alert addButtonWithTitle:@"Cancel"];
+    [alert.window setInitialFirstResponder:input];
+    if ([alert runModal] != NSAlertFirstButtonReturn) return;
+
+    NSInteger target = input.integerValue;
+    if (target < 1) return;
+
+    NSString *s = _editorView.string;
+    NSInteger line = 1;
+    NSUInteger index = 0;
+    NSRange lineRange = NSMakeRange(0, 0);
+    while (index <= s.length) {
+        NSRange r = [s lineRangeForRange:NSMakeRange(index, 0)];
+        if (line == target) { lineRange = r; break; }
+        if (NSMaxRange(r) <= index) break;  // reached end
+        index = NSMaxRange(r);
+        line++;
+    }
+    if (line != target) {  // beyond end -> go to last position
+        lineRange = NSMakeRange(s.length, 0);
+    }
+    NSRange caret = NSMakeRange(lineRange.location, 0);
+    [_editorView setSelectedRange:caret];
+    [_editorView scrollRangeToVisible:caret];
+    [_editorView showFindIndicatorForRange:[s lineRangeForRange:caret]];
+    [_window makeFirstResponder:_editorView];
 }
 
 - (NSView *)buildConsole {
@@ -789,6 +1060,7 @@ static void pinFill(NSView *v, NSView *container) {
     }
     [self rehighlight];
     [_ruler refresh];
+    if (_findVisible) [self performFind:NO];
 }
 
 - (void)rehighlight {

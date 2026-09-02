@@ -33,14 +33,17 @@ Required areas: Explorer (folder tree), main text editor, console, custom script
 - Script shortcuts: bind custom key combos to scripts (right-click → Assign Shortcut); shown
   in the script list, registered as Scripts-menu items, persisted in NSUserDefaults.
 - Session restore: last folder + open tabs + active tab reopened on launch.
+- Find & Replace bar (⌘F) with all-match highlighting, next/prev (⌘G/⇧⌘G), case toggle,
+  replace + replace-all, live match count.
+- Go to Line (⌘L) jump box.
+- Script arguments: `@prompt:` directive in a script triggers an input dialog before running;
+  value exposed as `cleanedit.get_arg()` (Python) / `editor.getArg()` & `argument` (JS).
 
 ## Verification status
-- JSON grammars validated; Python scripts compile; string-highlight regex smoke-tested.
-- Edited controller: braces/parens balanced, @implementation/@end counts correct.
+- JSON grammars validated; Python scripts compile; brace/paren balance verified.
 - NOT compiled/run here (Linux cloud lacks macOS frameworks). Needs Xcode CLT on macOS.
 
 ## Backlog / Next
-- Find & replace (⌘F), Go to line.
 - Auto-indent / bracket matching.
 - Refine `.npa` / `.tpa` grammars to the real language spec (placeholders for now).
 - Split editor / side-by-side.

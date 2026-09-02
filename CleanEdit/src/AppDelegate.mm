@@ -71,6 +71,11 @@
     [editMenu addItemWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"c"];
     [editMenu addItemWithTitle:@"Paste" action:@selector(paste:) keyEquivalent:@"v"];
     [editMenu addItemWithTitle:@"Select All" action:@selector(selectAll:) keyEquivalent:@"a"];
+    [editMenu addItem:[NSMenuItem separatorItem]];
+    [self add:editMenu title:@"Find\u2026" action:@selector(showFindBar:) key:@"f" flags:NSEventModifierFlagCommand];
+    [self add:editMenu title:@"Find Next" action:@selector(findNext:) key:@"g" flags:NSEventModifierFlagCommand];
+    [self add:editMenu title:@"Find Previous" action:@selector(findPrevious:) key:@"g" flags:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
+    [self add:editMenu title:@"Go to Line\u2026" action:@selector(gotoLine:) key:@"l" flags:NSEventModifierFlagCommand];
     editItem.submenu = editMenu;
 
     NSApp.mainMenu = mainMenu;

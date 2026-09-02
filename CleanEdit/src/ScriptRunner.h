@@ -2,11 +2,12 @@
 #import "EditorHost.h"
 
 @interface JSScriptRunner : NSObject
-+ (void)runScriptAtPath:(NSString *)path host:(id<EditorHost>)host;
++ (void)runScriptAtPath:(NSString *)path argument:(NSString *)argument host:(id<EditorHost>)host;
 @end
 
 @interface PythonScriptRunner : NSObject
 + (void)runScriptAtPath:(NSString *)path
               scriptsDir:(NSString *)scriptsDir
+                argument:(NSString *)argument
                     host:(id<EditorHost>)host;
 @end

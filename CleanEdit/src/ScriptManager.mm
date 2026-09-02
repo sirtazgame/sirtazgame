@@ -57,13 +57,50 @@
     return result;
 }
 
+- (NSString *)promptMessageInSource:(NSString *)src {
+    if (!src.length) return nil;
+    NSError *err = nil;
+    NSRegularExpression *re = [NSRegularExpression
+        regularExpressionWithPattern:@"^\\s*(?://|#)\\s*@prompt:?\\s*(.+)$"
+                              options:NSRegularExpressionAnchorsMatchLines error:&err];
+    if (!re) return nil;
+    NSTextCheckingResult *m = [re firstMatchInString:src options:0 range:NSMakeRange(0, src.length)];
+    if (!m) return nil;
+    NSString *msg = [src substringWithRange:[m rangeAtIndex:1]];
+    return [msg stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+}
+
+- (NSString *)askArgumentWithMessage:(NSString *)message forScript:(NSString *)name {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = name;
+    alert.informativeText = message.length ? message : @"Enter a value";
+    NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 260, 24)];
+    alert.accessoryView = input;
+    [alert addButtonWithTitle:@"Run"];
+    [alert addButtonWithTitle:@"Cancel"];
+    [alert.window setInitialFirstResponder:input];
+    if ([alert runModal] != NSAlertFirstButtonReturn) return nil;  // cancelled
+    return input.stringValue;
+}
+
 - (void)runScriptAtURL:(NSURL *)url host:(id<EditorHost>)host {
     NSString *ext = url.pathExtension.lowercaseString;
+    NSString *src = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
+
+    NSString *arg = @"";
+    NSString *promptMsg = [self promptMessageInSource:src];
+    if (promptMsg) {
+        NSString *value = [self askArgumentWithMessage:promptMsg forScript:url.lastPathComponent];
+        if (value == nil) return;  // user cancelled -> don't run
+        arg = value;
+    }
+
     if ([ext isEqualToString:@"js"]) {
-        [JSScriptRunner runScriptAtPath:url.path host:host];
+        [JSScriptRunner runScriptAtPath:url.path argument:arg host:host];
     } else if ([ext isEqualToString:@"py"]) {
         [PythonScriptRunner runScriptAtPath:url.path
                                  scriptsDir:self.scriptsDirectory.path
+                                   argument:arg
                                        host:host];
     } else {
         [host appendConsole:@"Unsupported script type (use .js or .py)." type:@"error"];

@@ -44,6 +44,11 @@ def get_file_path():
     return os.environ.get("CLEANEDIT_FILE", "")
 
 
+def get_arg():
+    """Return the argument entered via an @prompt directive (empty if none)."""
+    return os.environ.get("CLEANEDIT_ARG", "")
+
+
 def set_text(text):
     """Replace the entire document content."""
     _send({"action": "setText", "value": str(text)})

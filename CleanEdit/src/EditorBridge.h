@@ -11,10 +11,12 @@
 - (void)insertText:(NSString *)text;
 - (NSString *)getFilePath;
 - (NSInteger)getLineCount;
+- (NSString *)getArg;
 - (void)log:(NSString *)message;
 @end
 
 @interface EditorBridge : NSObject <EditorJSExport>
+@property (copy) NSString *argument;
 - (instancetype)initWithHost:(id<EditorHost>)host;
 // Applies a command dictionary produced by the Python bridge protocol.
 - (void)applyCommand:(NSDictionary *)cmd;

@@ -6,7 +6,7 @@
 
 @implementation JSScriptRunner
 
-+ (void)runScriptAtPath:(NSString *)path host:(id<EditorHost>)host {
++ (void)runScriptAtPath:(NSString *)path argument:(NSString *)argument host:(id<EditorHost>)host {
     NSError *err = nil;
     NSString *src = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&err];
     if (!src) {
@@ -17,7 +17,9 @@
 
     JSContext *ctx = [[JSContext alloc] init];
     EditorBridge *bridge = [[EditorBridge alloc] initWithHost:host];
+    bridge.argument = argument ?: @"";
     ctx[@"editor"] = bridge;
+    ctx[@"argument"] = argument ?: @"";
 
     // console.log support
     JSValue *console = [JSValue valueWithNewObjectInContext:ctx];
@@ -51,6 +53,7 @@ static NSMutableArray *gRunningTasks;  // keep NSTask instances alive
 
 + (void)runScriptAtPath:(NSString *)path
               scriptsDir:(NSString *)scriptsDir
+                argument:(NSString *)argument
                     host:(id<EditorHost>)host {
     NSString *tmp = NSTemporaryDirectory();
     NSString *inputPath = [tmp stringByAppendingPathComponent:@"cleanedit_input.txt"];
@@ -66,6 +69,7 @@ static NSMutableArray *gRunningTasks;  // keep NSTask instances alive
     env[@"CLEANEDIT_INPUT"] = inputPath;
     env[@"CLEANEDIT_SELECTION"] = selPath;
     env[@"CLEANEDIT_FILE"] = [host currentFilePath] ?: @"";
+    env[@"CLEANEDIT_ARG"] = argument ?: @"";
     NSString *existing = env[@"PYTHONPATH"];
     env[@"PYTHONPATH"] = existing.length
         ? [NSString stringWithFormat:@"%@:%@", scriptsDir, existing]

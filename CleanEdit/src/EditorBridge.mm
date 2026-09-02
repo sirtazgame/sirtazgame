@@ -25,6 +25,8 @@
 
 - (NSInteger)getLineCount { return [_host editorLineCount]; }
 
+- (NSString *)getArg { return _argument ?: @""; }
+
 - (void)log:(NSString *)message {
     [_host appendConsole:message ?: @"" type:@"output"];
 }

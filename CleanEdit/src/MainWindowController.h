@@ -11,7 +11,7 @@
 @end
 
 @interface MainWindowController : NSObject <EditorHost, FileTreeDelegate,
-    NSTextViewDelegate, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
+    NSTextViewDelegate, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
 - (void)showWindow;
 - (NSWindow *)window;
 
@@ -23,6 +23,10 @@
 - (void)closeCurrentTab:(id)sender;
 - (void)toggleConsole:(id)sender;
 - (void)runFocusedScript:(id)sender;
+- (void)showFindBar:(id)sender;
+- (void)findNext:(id)sender;
+- (void)findPrevious:(id)sender;
+- (void)gotoLine:(id)sender;
 
 // Called by the app delegate to give the controller the Scripts submenu so it can
 // register user-defined script shortcuts as menu items.
