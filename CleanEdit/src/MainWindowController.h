@@ -23,4 +23,8 @@
 - (void)closeCurrentTab:(id)sender;
 - (void)toggleConsole:(id)sender;
 - (void)runFocusedScript:(id)sender;
+
+// Called by the app delegate to give the controller the Scripts submenu so it can
+// register user-defined script shortcuts as menu items.
+- (void)setScriptsMenu:(NSMenu *)menu;
 @end

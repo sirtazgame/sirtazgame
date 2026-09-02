@@ -13,7 +13,8 @@ scripting system, and settings.
   undo/redo, and multiple open documents.
 - **Console** — output panel for script results and errors (toggle with `⌘J`).
 - **Scripts** — write your own automations in **JavaScript** or **Python** and run them
-  against the current document.
+  against the current document. Bind **custom keyboard shortcuts** to any script.
+- **Session restore** — reopens your last folder and tabs automatically on launch.
 - **Settings** — font size, tab width, line numbers, word wrap, console visibility.
 - **Dark theme** throughout, VSCode-inspired palette.
 
@@ -108,6 +109,12 @@ Anything printed with `print()` also appears in the console. Python scripts run 
 subprocess, so `import`-ing any installed package works normally.
 
 You can also press `⌘R` to run the currently focused editor buffer as a script.
+
+### Script shortcuts
+Right-click any script in the **Scripts** panel and choose **Assign Shortcut…** to bind a
+key combination (e.g. `⌘⇧U`). The shortcut appears next to the script name and is added to
+the **Scripts** menu, so it works anywhere in the app. Bindings persist across launches;
+use **Clear Shortcut** to remove one.
 
 ## Keyboard shortcuts
 

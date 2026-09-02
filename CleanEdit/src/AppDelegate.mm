@@ -57,6 +57,7 @@
     NSMenu *scriptsMenu = [[NSMenu alloc] initWithTitle:@"Scripts"];
     [self add:scriptsMenu title:@"Run Current File as Script" action:@selector(runFocusedScript:) key:@"r" flags:NSEventModifierFlagCommand];
     scriptsItem.submenu = scriptsMenu;
+    [_controller setScriptsMenu:scriptsMenu];
 
     // Edit menu (standard, gives Cut/Copy/Paste/Undo)
     NSMenuItem *editItem = [[NSMenuItem alloc] init];

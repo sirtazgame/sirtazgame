@@ -37,11 +37,13 @@
 
     NSTableView *_scriptsTable;
     NSArray<NSURL *> *_scripts;
+    NSMenu *_scriptsMenu;
 
     NSMutableArray<OpenDocument *> *_documents;
     NSInteger _currentIndex;
     BOOL _consoleVisible;
     BOOL _updatingEditor;
+    BOOL _restoring;
 }
 @end
 
@@ -85,7 +87,9 @@ static void pinFill(NSView *v, NSView *container) {
     [[ScriptManager shared] ensureScriptsInstalled];
     [self reloadScripts];
     [self selectSidebarIndex:0];
-    [self newFile:nil];
+    if (![self restoreSession]) {
+        [self newFile:nil];
+    }
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [self->_hSplit setPosition:250 ofDividerAtIndex:0];
@@ -270,6 +274,14 @@ static void pinFill(NSView *v, NSView *container) {
     _scriptsTable.doubleAction = @selector(runSelectedScript:);
     _scriptsTable.action = @selector(openSelectedScript:);
 
+    NSMenu *ctx = [[NSMenu alloc] init];
+    [ctx addItemWithTitle:@"Run" action:@selector(contextRun:) keyEquivalent:@""].target = self;
+    [ctx addItemWithTitle:@"Edit" action:@selector(contextEdit:) keyEquivalent:@""].target = self;
+    [ctx addItem:[NSMenuItem separatorItem]];
+    [ctx addItemWithTitle:@"Assign Shortcut\u2026" action:@selector(assignShortcut:) keyEquivalent:@""].target = self;
+    [ctx addItemWithTitle:@"Clear Shortcut" action:@selector(clearShortcut:) keyEquivalent:@""].target = self;
+    _scriptsTable.menu = ctx;
+
     NSScrollView *scroll = [[NSScrollView alloc] init];
     scroll.documentView = _scriptsTable;
     scroll.hasVerticalScroller = YES;
@@ -277,7 +289,7 @@ static void pinFill(NSView *v, NSView *container) {
     scroll.backgroundColor = [Theme sidebarColor];
     scroll.borderType = NSNoBorder;
 
-    NSTextField *hint = [NSTextField labelWithString:@"Double-click to run \u00b7 Single-click to edit"];
+    NSTextField *hint = [NSTextField labelWithString:@"Double-click to run \u00b7 Right-click to assign a shortcut"];
     hint.font = [NSFont systemFontOfSize:11];
     hint.textColor = [Theme mutedTextColor];
 
@@ -621,6 +633,7 @@ static void pinFill(NSView *v, NSView *container) {
     _window.title = [NSString stringWithFormat:@"%@%@ \u2014 CleanEdit",
                      doc.modified ? @"\u25CF " : @"", doc.displayName];
     [self rebuildTabs];
+    [self saveSession];
 }
 
 - (void)rebuildTabs {
@@ -730,6 +743,7 @@ static void pinFill(NSView *v, NSView *container) {
     if ([panel runModal] == NSModalResponseOK) {
         [_tree setRootURL:panel.URL];
         [self selectSidebarIndex:0];
+        [self saveSession];
     }
 }
 
@@ -754,6 +768,7 @@ static void pinFill(NSView *v, NSView *container) {
     [self rehighlight];
     _window.title = [NSString stringWithFormat:@"%@ \u2014 CleanEdit", doc.displayName];
     [self rebuildTabs];
+    [self saveSession];
 }
 
 #pragma mark - FileTreeDelegate
@@ -878,6 +893,7 @@ static void pinFill(NSView *v, NSView *container) {
 - (void)reloadScripts {
     _scripts = [[ScriptManager shared] availableScripts];
     [_scriptsTable reloadData];
+    [self refreshScriptsMenu];
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
@@ -887,22 +903,37 @@ static void pinFill(NSView *v, NSView *container) {
 - (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)col row:(NSInteger)row {
     NSTableCellView *cell = [tableView makeViewWithIdentifier:@"scell" owner:self];
     if (!cell) {
-        cell = [[NSTableCellView alloc] initWithFrame:NSMakeRect(0, 0, 200, 20)];
+        cell = [[NSTableCellView alloc] initWithFrame:NSMakeRect(0, 0, 220, 20)];
         cell.identifier = @"scell";
+        cell.autoresizesSubviews = YES;
         NSImageView *iv = [[NSImageView alloc] initWithFrame:NSMakeRect(4, 2, 14, 14)];
         [cell addSubview:iv];
         cell.imageView = iv;
-        NSTextField *tf = [[NSTextField alloc] initWithFrame:NSMakeRect(24, 0, 180, 18)];
+        NSTextField *tf = [[NSTextField alloc] initWithFrame:NSMakeRect(24, 0, 130, 18)];
         tf.bordered = NO; tf.editable = NO; tf.drawsBackground = NO;
         tf.font = [Theme uiFont]; tf.textColor = [Theme textColor];
+        tf.lineBreakMode = NSLineBreakByTruncatingMiddle;
+        tf.autoresizingMask = NSViewWidthSizable;
         [cell addSubview:tf];
         cell.textField = tf;
+        NSTextField *sc = [[NSTextField alloc] initWithFrame:NSMakeRect(156, 0, 60, 18)];
+        sc.bordered = NO; sc.editable = NO; sc.drawsBackground = NO;
+        sc.font = [NSFont systemFontOfSize:11];
+        sc.textColor = [Theme mutedTextColor];
+        sc.alignment = NSTextAlignmentRight;
+        sc.tag = 555;
+        sc.autoresizingMask = NSViewMinXMargin;
+        [cell addSubview:sc];
     }
     NSURL *url = _scripts[row];
     cell.textField.stringValue = url.lastPathComponent;
     NSString *sym = [url.pathExtension.lowercaseString isEqualToString:@"py"] ? @"terminal" : @"curlybraces";
     cell.imageView.image = [NSImage imageWithSystemSymbolName:sym accessibilityDescription:nil];
     cell.imageView.contentTintColor = [Theme mutedTextColor];
+
+    NSTextField *sc = [cell viewWithTag:555];
+    NSDictionary *bind = [self shortcutBindings][url.lastPathComponent];
+    sc.stringValue = bind ? [self displayForKey:bind[@"key"] mods:[bind[@"mods"] integerValue]] : @"";
     return cell;
 }
 
@@ -1020,6 +1051,218 @@ static void pinFill(NSView *v, NSView *container) {
     BOOL ln = ([ud objectForKey:@"lineNumbers"] == nil) || [ud boolForKey:@"lineNumbers"];
     _editorScroll.rulersVisible = ln;
     [_ruler refresh];
+}
+
+#pragma mark - Session restore
+
+- (void)saveSession {
+    if (_restoring) return;
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+
+    if (_tree.rootURL) {
+        [ud setObject:_tree.rootURL.path forKey:@"lastFolder"];
+    } else {
+        [ud removeObjectForKey:@"lastFolder"];
+    }
+
+    OpenDocument *cur = [self currentDoc];
+    if (cur) cur.text = _editorView.string;
+
+    NSMutableArray *paths = [NSMutableArray array];
+    for (OpenDocument *d in _documents) {
+        if (d.url) [paths addObject:d.url.path];
+    }
+    [ud setObject:paths forKey:@"openFiles"];
+    [ud setObject:(cur.url ? cur.url.path : @"") forKey:@"currentFile"];
+}
+
+- (BOOL)restoreSession {
+    _restoring = YES;
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    NSString *folder = [ud stringForKey:@"lastFolder"];
+    if (folder.length && [fm fileExistsAtPath:folder]) {
+        [_tree setRootURL:[NSURL fileURLWithPath:folder]];
+    }
+
+    BOOL opened = NO;
+    for (NSString *p in [ud arrayForKey:@"openFiles"]) {
+        if ([p isKindOfClass:[NSString class]] && [fm fileExistsAtPath:p]) {
+            [self openURL:[NSURL fileURLWithPath:p]];
+            opened = YES;
+        }
+    }
+
+    NSString *curp = [ud stringForKey:@"currentFile"];
+    if (curp.length) {
+        for (NSInteger i = 0; i < (NSInteger)_documents.count; i++) {
+            if ([_documents[i].url.path isEqualToString:curp]) { [self switchToIndex:i]; break; }
+        }
+    }
+
+    _restoring = NO;
+    return opened;
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    [self saveSession];
+}
+
+#pragma mark - Script shortcuts
+
+- (void)setScriptsMenu:(NSMenu *)menu {
+    _scriptsMenu = menu;
+    [self refreshScriptsMenu];
+}
+
+- (NSMutableDictionary *)shortcutBindings {
+    NSDictionary *d = [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"scriptShortcuts"];
+    return d ? [d mutableCopy] : [NSMutableDictionary dictionary];
+}
+
+- (void)saveBindings:(NSDictionary *)bindings {
+    [[NSUserDefaults standardUserDefaults] setObject:bindings forKey:@"scriptShortcuts"];
+}
+
+- (NSString *)displayForKey:(NSString *)key mods:(NSInteger)mods {
+    NSMutableString *s = [NSMutableString string];
+    if (mods & NSEventModifierFlagControl) [s appendString:@"\u2303"];
+    if (mods & NSEventModifierFlagOption)  [s appendString:@"\u2325"];
+    if (mods & NSEventModifierFlagShift)   [s appendString:@"\u21E7"];
+    if (mods & NSEventModifierFlagCommand) [s appendString:@"\u2318"];
+    [s appendString:key.uppercaseString];
+    return s;
+}
+
+- (void)refreshScriptsMenu {
+    if (!_scriptsMenu) return;
+    // Keep the first static item ("Run Current File as Script"); rebuild the rest.
+    while (_scriptsMenu.numberOfItems > 1) {
+        [_scriptsMenu removeItemAtIndex:_scriptsMenu.numberOfItems - 1];
+    }
+    NSDictionary *bindings = [self shortcutBindings];
+    BOOL addedSeparator = NO;
+    for (NSURL *url in [[ScriptManager shared] availableScripts]) {
+        NSDictionary *bind = bindings[url.lastPathComponent];
+        if (!bind) continue;
+        if (!addedSeparator) {
+            [_scriptsMenu addItem:[NSMenuItem separatorItem]];
+            addedSeparator = YES;
+        }
+        NSString *key = [bind[@"key"] lowercaseString] ?: @"";
+        NSInteger mods = [bind[@"mods"] integerValue];
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Run %@", url.lastPathComponent]
+                                                      action:@selector(runBoundScript:)
+                                               keyEquivalent:key];
+        item.keyEquivalentModifierMask = mods;
+        item.target = self;
+        item.representedObject = url;
+        [_scriptsMenu addItem:item];
+    }
+}
+
+- (void)runBoundScript:(NSMenuItem *)sender {
+    NSURL *url = sender.representedObject;
+    if (url) {
+        [self selectSidebarIndex:1];
+        [[ScriptManager shared] runScriptAtURL:url host:self];
+    }
+}
+
+- (NSURL *)contextScript {
+    NSInteger row = _scriptsTable.clickedRow;
+    if (row < 0) row = _scriptsTable.selectedRow;
+    if (row < 0 || row >= (NSInteger)_scripts.count) return nil;
+    return _scripts[row];
+}
+
+- (void)contextRun:(id)sender {
+    NSURL *u = [self contextScript];
+    if (u) [[ScriptManager shared] runScriptAtURL:u host:self];
+}
+
+- (void)contextEdit:(id)sender {
+    NSURL *u = [self contextScript];
+    if (u) [self openURL:u];
+}
+
+- (void)clearShortcut:(id)sender {
+    NSURL *u = [self contextScript];
+    if (!u) return;
+    NSMutableDictionary *b = [self shortcutBindings];
+    [b removeObjectForKey:u.lastPathComponent];
+    [self saveBindings:b];
+    [self reloadScripts];
+}
+
+- (void)assignShortcut:(id)sender {
+    NSURL *u = [self contextScript];
+    if (!u) return;
+
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = [NSString stringWithFormat:@"Shortcut for %@", u.lastPathComponent];
+    alert.informativeText = @"Type a single key and pick modifiers (at least one).";
+
+    NSView *acc = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 280, 92)];
+
+    NSTextField *keyLabel = [NSTextField labelWithString:@"Key:"];
+    keyLabel.frame = NSMakeRect(0, 62, 34, 20);
+    [acc addSubview:keyLabel];
+
+    NSTextField *keyField = [[NSTextField alloc] initWithFrame:NSMakeRect(38, 60, 44, 24)];
+    [acc addSubview:keyField];
+
+    NSButton *cmd = [NSButton checkboxWithTitle:@"\u2318 Command" target:nil action:nil];
+    cmd.frame = NSMakeRect(0, 34, 130, 20);
+    cmd.state = NSControlStateValueOn;
+    [acc addSubview:cmd];
+
+    NSButton *shift = [NSButton checkboxWithTitle:@"\u21E7 Shift" target:nil action:nil];
+    shift.frame = NSMakeRect(140, 34, 130, 20);
+    [acc addSubview:shift];
+
+    NSButton *option = [NSButton checkboxWithTitle:@"\u2325 Option" target:nil action:nil];
+    option.frame = NSMakeRect(0, 8, 130, 20);
+    [acc addSubview:option];
+
+    NSButton *control = [NSButton checkboxWithTitle:@"\u2303 Control" target:nil action:nil];
+    control.frame = NSMakeRect(140, 8, 130, 20);
+    [acc addSubview:control];
+
+    alert.accessoryView = acc;
+    [alert addButtonWithTitle:@"Assign"];
+    [alert addButtonWithTitle:@"Cancel"];
+
+    if ([alert runModal] != NSAlertFirstButtonReturn) return;
+
+    NSString *key = keyField.stringValue;
+    if (key.length == 0) {
+        NSBeep();
+        return;
+    }
+    key = [[key substringToIndex:1] lowercaseString];
+
+    NSInteger mods = 0;
+    if (cmd.state == NSControlStateValueOn)     mods |= NSEventModifierFlagCommand;
+    if (shift.state == NSControlStateValueOn)   mods |= NSEventModifierFlagShift;
+    if (option.state == NSControlStateValueOn)  mods |= NSEventModifierFlagOption;
+    if (control.state == NSControlStateValueOn) mods |= NSEventModifierFlagControl;
+    if (mods == 0) mods = NSEventModifierFlagCommand;  // require a modifier
+
+    NSMutableDictionary *b = [self shortcutBindings];
+    // Remove any other script already using this exact combo.
+    for (NSString *fn in [b.allKeys copy]) {
+        NSDictionary *e = b[fn];
+        if ([e[@"key"] isEqualToString:key] && [e[@"mods"] integerValue] == mods) {
+            [b removeObjectForKey:fn];
+        }
+    }
+    b[u.lastPathComponent] = @{ @"key": key, @"mods": @(mods) };
+    [self saveBindings:b];
+    [self reloadScripts];
+    [self appendConsole:[NSString stringWithFormat:@"Bound %@ to %@",
+                         [self displayForKey:key mods:mods], u.lastPathComponent] type:@"info"];
 }
 
 @end

@@ -21,8 +21,7 @@ Required areas: Explorer (folder tree), main text editor, console, custom script
   subprocess with a `cleanedit` helper module + `##CE##` JSON stdout protocol.
 - Scripts stored in `~/Library/Application Support/CleanEdit/scripts/` (examples auto-installed).
 
-## Implemented (2026-06)
-- Activity bar (Explorer / Scripts / Settings) with panel switching.
+## Implemented (2026-06) (Explorer / Scripts / Settings) with panel switching.
 - Explorer folder tree (NSOutlineView), single-click opens files.
 - Editor: NSTextView, line-number gutter, syntax highlighting, tabs, multi-document,
   undo/redo, non-wrapping by default.
@@ -31,14 +30,18 @@ Required areas: Explorer (folder tree), main text editor, console, custom script
 - Settings: font size, tab width, line numbers, word wrap, console visibility (NSUserDefaults).
 - Dark VSCode-inspired theme; menu bar with standard + custom shortcuts.
 - Languages bundled: C++, Python, JavaScript, JSON, Markdown, NPA, TPA.
+- Script shortcuts: bind custom key combos to scripts (right-click → Assign Shortcut); shown
+  in the script list, registered as Scripts-menu items, persisted in NSUserDefaults.
+- Session restore: last folder + open tabs + active tab reopened on launch.
 
 ## Verification status
 - JSON grammars validated; Python scripts compile; string-highlight regex smoke-tested.
+- Edited controller: braces/parens balanced, @implementation/@end counts correct.
 - NOT compiled/run here (Linux cloud lacks macOS frameworks). Needs Xcode CLT on macOS.
 
 ## Backlog / Next
 - Find & replace (⌘F), Go to line.
 - Auto-indent / bracket matching.
 - Refine `.npa` / `.tpa` grammars to the real language spec (placeholders for now).
-- Split editor / side-by-side, session restore (reopen last folder & tabs).
+- Split editor / side-by-side.
 - App icon, code signing/notarization instructions.
