@@ -1,0 +1,37 @@
+{
+  "summary": "Static-only source review of the CleanEdit macOS Objective-C++ project (cannot compile in this Linux container, per instructions). Verified the specific bug-fix (renamed C++ reserved keyword `template` -> `contents` in ScriptManager.mm createNewScriptWithName:), scanned all 20 files under /app/CleanEdit/src/ for C++ reserved-keyword identifiers, @interface/@implementation/@end balance, brace/paren/bracket balance, and every [self ...] message send to confirm the target selector is declared or defined somewhere in the project. Also validated all JSON grammars and Python scripts under Resources/. No compile-blockers found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MainWindowController.mm is 1599 lines and mixes editor host impl, find/replace, tabs, script UI and console logic. Recommend splitting into FindReplaceController, TabManager, ConsoleController, and EditorHostImpl for maintainability (>700 line guideline).",
+    "ScriptManager copies bundled scripts on first launch but does not update them when the app ships an updated version (only copies when file does not exist). Consider a version marker or bundled `cleanedit.py` overwrite so bugfixes to helper scripts reach existing users.",
+    "ScriptManager.runScriptAtURL: silently ignores read errors when the .py/.js file cannot be loaded (`error:nil`). If the file is unreadable, `src` is nil and the prompt regex returns nil -> script runs with empty arg, and the user sees no error. Consider surfacing read errors to the console.",
+    "Several NSFileManager calls pass error:nil (ScriptManager.mm ensureScriptsInstalled, availableScripts, createNewScriptWithName). Failures during bundle -> Application Support copy will be invisible; recommend logging."
+  ],
+  "static_review_findings": {
+    "cpp_reserved_keywords_as_identifiers": "NONE. Searched: template, class, new, delete, this, namespace, operator, private, public, protected, friend, virtual, typename, export, register, and, or, not, xor, bitand, compl. Only benign hits found were ObjC selectors like [X class], [X new], and the string literal @\"operator\" in Theme.mm (token color key) — all valid in Objective-C++.",
+    "interface_implementation_end_balance": "Balanced across all .h/.mm files. Headers EditorBridge.h, EditorHost.h, FileTreeController.h use @protocol which also closes with @end; totals reconcile.",
+    "brace_paren_bracket_balance": "All files balanced. A naive counter reported ScriptManager.mm off-by-one due to the regex literal @\"^\\\\s*(?://|#)\\\\s*@prompt...\" containing `(` and `//` inside a string; manual inspection confirms the file is balanced.",
+    "self_message_selector_coverage": "0 undefined selectors. Extracted 158 declared/defined selectors project-wide and verified every top-level [self ...] send resolves to one of them (with proper depth-aware parsing to avoid false positives from nested @selector(...) and inner message sends).",
+    "createNewScriptWithName_fix_verified": "Line 118 declares `NSString *contents;` and lines 120/122/124 assign/write it. No `template` identifier remains anywhere in src/*.mm or src/*.h.",
+    "imports": "Spot-checked #imports across ScriptManager.mm, MainWindowController.mm, SyntaxHighlighter.mm, ScriptRunner.mm, EditorBridge.mm — all cross-file symbols used have matching #import.",
+    "json_grammars": "All 7 files in Resources/languages/ (cpp.json, javascript.json, json.json, markdown.json, npa.json, python.json, tpa.json) are valid JSON.",
+    "python_scripts": "All 5 .py files in Resources/scripts/ (cleanedit.py, greet.py, insert_date.py, npa_mode.py, word_count.py) compile via py_compile."
+  },
+  "updated_files": [],
+  "success_rate": {"backend": "100% (static checks)", "frontend": "N/A (not a web app)"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "This is a native macOS Cocoa/JavaScriptCore text editor written in Objective-C++. It cannot be compiled or run in the Linux container (no macOS SDK). All verification is static: grep-based keyword scans, ObjC @end balance, brace/paren/bracket balance, and a depth-aware [self ...] selector resolver against declared/defined methods in the project. The build is done on the user's Mac via /app/CleanEdit/build.sh. Do NOT try supervisor/curl/playwright.",
+  "rca of the issue": "Bug just fixed: ScriptManager.mm previously declared `NSString *template;` which uses the C++ reserved keyword `template` as an identifier. Under -x objective-c++ this causes a hard compile error (`expected unqualified-id`). Fix (already applied) renames the local to `contents`. Verified: no `template` identifier remains in any .mm/.h under /app/CleanEdit/src/; createNewScriptWithName: is syntactically consistent (declaration on line 118, assignments 120/122, write 124)."
+}

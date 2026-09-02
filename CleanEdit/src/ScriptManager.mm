@@ -85,7 +85,14 @@
 
 - (void)runScriptAtURL:(NSURL *)url host:(id<EditorHost>)host {
     NSString *ext = url.pathExtension.lowercaseString;
-    NSString *src = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
+    NSError *readErr = nil;
+    NSString *src = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:&readErr];
+    if (!src) {
+        [host appendConsole:[NSString stringWithFormat:@"Could not read %@: %@",
+                             url.lastPathComponent, readErr.localizedDescription ?: @"unknown error"]
+                       type:@"error"];
+        return;
+    }
 
     NSString *arg = @"";
     NSString *promptMsg = [self promptMessageInSource:src];
@@ -115,13 +122,13 @@
 - (NSURL *)createNewScriptWithName:(NSString *)name {
     NSURL *url = [self.scriptsDirectory URLByAppendingPathComponent:name];
     NSString *ext = url.pathExtension.lowercaseString;
-    NSString *template;
+    NSString *contents;
     if ([ext isEqualToString:@"py"]) {
-        template = @"import cleanedit\n\n# Your script here.\ncleanedit.log(\"Hello from a new Python script!\")\n";
+        contents = @"import cleanedit\n\n# Your script here.\ncleanedit.log(\"Hello from a new Python script!\")\n";
     } else {
-        template = @"// Your script here.\neditor.log(\"Hello from a new JavaScript script!\");\n";
+        contents = @"// Your script here.\neditor.log(\"Hello from a new JavaScript script!\");\n";
     }
-    [template writeToURL:url atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [contents writeToURL:url atomically:YES encoding:NSUTF8StringEncoding error:nil];
     return url;
 }
 
