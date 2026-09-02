@@ -1,10 +1,10 @@
 #!/bin/bash
-# Build script for CleanEdit (native macOS app).
-# Requires: Xcode Command Line Tools (clang++). Run on macOS.
+# Double-clickable build launcher for CleanEdit.
+# In Finder: right-click -> Open (first time) to bypass Gatekeeper, or run in Terminal.
+# Requires: Xcode Command Line Tools (clang++).
 set -e
 
-# Always run from the directory this script lives in, so relative paths
-# (src/, Resources/, Info.plist) resolve no matter where it is launched from.
+# Run from this script's own folder regardless of where it was launched.
 cd "$(dirname "$0")"
 
 APP_NAME="CleanEdit"
@@ -33,5 +33,5 @@ cp -R Resources/scripts "$CONTENTS/Resources/"
 
 echo ""
 echo "Build complete: $BUNDLE"
-echo "Run it with:  open $BUNDLE"
-echo "Or directly:  ./$CONTENTS/MacOS/$APP_NAME"
+echo "==> Launching CleanEdit"
+open "$BUNDLE"
